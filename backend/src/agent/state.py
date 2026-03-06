@@ -1,0 +1,22 @@
+from typing import Annotated, Sequence, TypedDict
+
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
+
+
+class AgentState(TypedDict):
+    """Shared state for the Agentic Boards ReAct agent.
+
+    The ``messages`` list is the core exchange:  the LLM's tool_calls and
+    ToolMessages flow through it automatically via LangGraph's ToolNode.
+
+    The remaining fields carry context injected by the API layer so that
+    tools / the LLM can reference the current dashboard state.
+    """
+
+    messages: Annotated[Sequence[BaseMessage], add_messages]
+
+    # ── Context injected from the frontend ────────────────────────────
+    current_tiles: list[dict]   # [{tile_id, title, vega_spec, layout}, ...]
+    chat_history: list[dict]    # [{role, content}, ...]
+
