@@ -1,5 +1,5 @@
 """
-LangChain-compatible wrapper around the Accenture GenAI gateway.
+LangChain-compatible wrapper around the GenAI gateway.
 
 Subclasses ``BaseChatModel`` so it plugs into any LangGraph node.
 
@@ -9,7 +9,7 @@ Message mapping
     Conversation history   →  payload["example"] array
 
 Tool-calling
-    The Accenture endpoint is a plain ChatCompletion endpoint with no
+    The gateway endpoint is a plain ChatCompletion endpoint with no
     native function-calling support.  We emulate OpenAI-style tool_calls
     by injecting a tool-schema block into the system prompt and parsing
     the model's JSON response back into AIMessage.tool_calls so that
@@ -28,7 +28,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from src.llm.accenture_client import AccentureGenAIClient
+from src.llm.gateway_client import GatewayGenAIClient
 
 logger = logging.getLogger(__name__)
 
@@ -145,11 +145,11 @@ def _build_ai_message(text: str) -> AIMessage:
 
 
 # ---------------------------------------------------------------------------
-# AccentureChatModel
+# GatewayChatModel
 # ---------------------------------------------------------------------------
 
-class AccentureChatModel(BaseChatModel):
-    """LangChain BaseChatModel backed by the Accenture GenAI gateway."""
+class GatewayChatModel(BaseChatModel):
+    """LangChain BaseChatModel backed by the GenAI gateway."""
 
     client: Any = None
 
@@ -158,7 +158,7 @@ class AccentureChatModel(BaseChatModel):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         object.__setattr__(self, "_bound_tools_list", [])
-        object.__setattr__(self, "client", AccentureGenAIClient())
+        object.__setattr__(self, "client", GatewayGenAIClient())
 
     # ------------------------------------------------------------------
     # bind_tools  — emulated via prompt injection
@@ -168,9 +168,9 @@ class AccentureChatModel(BaseChatModel):
         self,
         tools: Sequence,
         **kwargs: Any,
-    ) -> "AccentureChatModel":
+    ) -> "GatewayChatModel":
         """Return a copy of this model with tools injected into the system prompt."""
-        clone = AccentureChatModel()
+        clone = GatewayChatModel()
         object.__setattr__(clone, "_bound_tools_list", list(tools))
         return clone
 
@@ -191,7 +191,7 @@ class AccentureChatModel(BaseChatModel):
 
     @property
     def _llm_type(self) -> str:
-        return "accenture-genai"
+        return "gateway-genai"
 
     # ------------------------------------------------------------------
     # Sync path  (used by LangGraph .invoke())
@@ -241,7 +241,7 @@ class AccentureChatModel(BaseChatModel):
 
     # ------------------------------------------------------------------
     # Message parsing — converts LangChain message list into the
-    # Accenture API format: (system_prompt, examples, final_question)
+    # Gateway API format: (system_prompt, examples, final_question)
     # ------------------------------------------------------------------
 
     @staticmethod

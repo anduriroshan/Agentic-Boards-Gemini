@@ -9,7 +9,7 @@ Verifies each layer independently:
 
 Supports both modes:
   passthrough  — OpenAI-compatible endpoint, api-key auth
-  custom       — Accenture proprietary ChatCompletion, OAuth2
+  custom       — Custom proprietary ChatCompletion, OAuth2
 
 Usage:
     cd backend

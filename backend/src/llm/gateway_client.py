@@ -1,5 +1,5 @@
 """
-Accenture GenAI ChatCompletion client.
+Gateway GenAI ChatCompletion client.
 
 Provides both sync and async interfaces to the gateway.  Uses direct
 ``requests`` for the sync path and ``httpx`` for the async path.
@@ -11,6 +11,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import requests
+import time
+import asyncio
 
 from src.config import settings
 from src.llm.auth import TokenManager
@@ -18,8 +20,8 @@ from src.llm.auth import TokenManager
 logger = logging.getLogger(__name__)
 
 
-class AccentureGenAIClient:
-    """Low-level HTTP client for the Accenture GenAI ChatCompletion endpoint.
+class GatewayGenAIClient:
+    """Low-level HTTP client for the Gateway GenAI ChatCompletion endpoint.
 
     Uses ``LLM_API_URL`` directly — no URL assembly required.
     """
@@ -78,15 +80,24 @@ class AccentureGenAIClient:
             "X-UserId": self.user_id,
         }
 
-        logger.info("POST %s …", self.api_url[:80])
-        resp = requests.post(self.api_url, headers=headers, json=payload, timeout=120)
+        max_retries = 3
+        for attempt in range(max_retries):
+            logger.info("POST %s … (Attempt %d/%d)", self.api_url[:80], attempt + 1, max_retries)
+            resp = requests.post(self.api_url, headers=headers, json=payload, timeout=120)
 
-        if not resp.ok:
-            raise RuntimeError(
-                f"GenAI API returned {resp.status_code}: {resp.text[:500]}"
-            )
+            if resp.status_code in (502, 503, 504) and attempt < max_retries - 1:
+                logger.warning("GenAI API returned %s. Retrying in %ds...", resp.status_code, 2 ** attempt)
+                time.sleep(2 ** attempt)
+                continue
 
-        return self._extract_answer(resp.json())
+            if not resp.ok:
+                raise RuntimeError(
+                    f"GenAI API returned {resp.status_code}: {resp.text[:500]}"
+                )
+
+            return self._extract_answer(resp.json())
+        
+        raise RuntimeError("GenAI API failed after max retries")
 
     # ------------------------------------------------------------------
     # Async (used by the LangChain wrapper)
@@ -116,10 +127,20 @@ class AccentureGenAIClient:
             "Content-Type": "application/json",
         }
 
+        max_retries = 3
         async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(self.api_url, json=payload, headers=headers)
-            resp.raise_for_status()
-            return self._extract_answer(resp.json())
+            for attempt in range(max_retries):
+                resp = await client.post(self.api_url, json=payload, headers=headers)
+                
+                if resp.status_code in (502, 503, 504) and attempt < max_retries - 1:
+                    logger.warning("GenAI API returned %s. Retrying in %ds...", resp.status_code, 2 ** attempt)
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                    
+                resp.raise_for_status()
+                return self._extract_answer(resp.json())
+        
+        raise RuntimeError("GenAI API failed after max retries")
 
     # ------------------------------------------------------------------
     # Prompt builder (financial context enrichment)

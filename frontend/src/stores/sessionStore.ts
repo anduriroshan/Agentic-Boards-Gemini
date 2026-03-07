@@ -49,6 +49,10 @@ export const useSessionStore = create<SessionState>((set) => ({
         for (const tile of session.dashboard.tiles) {
             if (tile.type === "table" && tile.tableData) {
                 dashStore.addTableTile(tile.id, tile.tableData, tile.title, tile.queryMeta);
+            } else if (tile.type === "text" && tile.textData) {
+                dashStore.addTextTile(tile.id, tile.textData.markdown, tile.title, tile.textData.fontSize);
+            } else if (tile.type === "kpi" && tile.kpiData) {
+                dashStore.addKpiTile(tile.id, tile.kpiData, tile.title);
             } else if (tile.vegaSpec) {
                 dashStore.addTile(tile.id, tile.vegaSpec, tile.title, tile.queryMeta);
             }

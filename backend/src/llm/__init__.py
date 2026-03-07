@@ -4,8 +4,8 @@ LangChain chat model based on ``LLM_MODE`` in your .env:
 
   - **passthrough** (default): OpenAI-compatible endpoint, api-key auth only.
     Uses ``langchain_openai.ChatOpenAI``.
-  - **custom**: Accenture proprietary ChatCompletion endpoint with Azure AD
-    OAuth2 token. Uses ``AccentureChatModel``.
+  - **custom**: Proprietary ChatCompletion endpoint with Azure AD
+    OAuth2 token. Uses ``GatewayChatModel``.
 
 All agent nodes should import ``get_llm`` instead of a concrete class.
 """
@@ -47,7 +47,7 @@ def get_llm() -> BaseChatModel:
 
 
 def _build_passthrough() -> BaseChatModel:
-    """Azure OpenAI-compatible endpoint via Accenture gateway.
+    """Azure OpenAI-compatible endpoint via GenAI gateway.
 
     URL pattern:
         {base_url}/openai/deployments/{model}/chat/completions?api-version=...
@@ -96,11 +96,11 @@ def _build_passthrough() -> BaseChatModel:
 
 
 def _build_custom() -> BaseChatModel:
-    """Accenture proprietary ChatCompletion + Azure AD OAuth2."""
-    from src.llm.langchain_wrapper import AccentureChatModel
+    """Proprietary ChatCompletion + Azure AD OAuth2."""
+    from src.llm.langchain_wrapper import GatewayChatModel
 
     logger.info("LLM mode=custom  url=%s", settings.llm_api_url[:80])
-    return AccentureChatModel()
+    return GatewayChatModel()
 
 
 def _build_openai() -> BaseChatModel:

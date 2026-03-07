@@ -10,32 +10,21 @@ _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 class Settings(BaseSettings):
     # ── LLM ───────────────────────────────────────────────────
     # Mode: "passthrough" (OpenAI-compatible, api-key auth)
-    #       "custom"      (Accenture proprietary ChatCompletion, OAuth2 token)
+    #       "custom"      (Custom proprietary ChatCompletion, OAuth2 token)
     llm_mode: str = Field(default="passthrough")
 
     # Pass-through mode settings (OpenAI-compatible)
     llm_api_key: str = Field(default="")
-    llm_base_url: str = Field(
-        default="https://apigatewayazeu.accenture.com/genai/stage/lbpass/",
-    )
+    llm_base_url: str = Field(default="")
     llm_model: str = Field(default="gpt-4.1-mini")
 
-    # Custom mode settings (Accenture proprietary endpoint, Azure AD OAuth2)
+    # Custom mode settings (Proprietary endpoint, Azure AD OAuth2)
     llm_tenant_id: str = Field(default="")
     llm_client_id: str = Field(default="")
     llm_client_secret: str = Field(default="")
-    llm_auth_scope: str = Field(
-        default="api://e053b11b-8480-4abf-9c64-a2e23be62ff5/.default",
-    )
-    llm_api_url: str = Field(
-        default=(
-            "https://apigatewayazeu.accenture.com/genai/stage/interaction/api/v1"
-            "/Client/7a4a8864-0e44-41a4-9181-b50fbcdfd2bd"
-            "/Engine/576E5532-31F4-40A9-B8B0-48EF68553B8C"
-            "/Model/9c530a7f-e6d4-411d-adb1-f0d2a3073b7f/ChatCompletion"
-        ),
-    )
-    llm_user_id: str = Field(default="2403")
+    llm_auth_scope: str = Field(default="")
+    llm_api_url: str = Field(default="")
+    llm_user_id: str = Field(default="")
     llm_system_context: str = Field(
         default=(
             "You are a financial analyst AI assistant specialising in variance analysis. "

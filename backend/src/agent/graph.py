@@ -132,7 +132,7 @@ def _build_system_message(state: AgentState) -> str:
 def _needs_visualization_nudge(state_messages: list) -> bool:
     """Return True if execute_sql returned data but create_visualization was never called.
 
-    Used to detect the common failure where the Accenture model describes the
+    Used to detect the common failure where the custom model describes the
     data in text instead of actually calling create_visualization.
     """
     sql_returned_data = False

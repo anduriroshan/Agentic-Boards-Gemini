@@ -14,7 +14,7 @@ class GenAIRequest(BaseModel):
 
 
 class GenAIResponse(BaseModel):
-    """Raw response from the Accenture GenAI gateway.
+    """Raw response from the GenAI gateway.
     The actual shape may vary; this captures the text answer."""
 
     answer: str

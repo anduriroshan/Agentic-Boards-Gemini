@@ -1,5 +1,5 @@
 """
-Token management for the Accenture GenAI Gateway.
+Token management for the GenAI Gateway.
 
 Uses Azure AD client-credentials flow via direct HTTP POST (no MSAL dependency).
 Tokens are cached in memory and auto-refreshed 60 s before expiry.
@@ -24,7 +24,7 @@ _TOKEN_REFRESH_BUFFER_SECONDS = 60
 
 
 class TokenManager:
-    """Manages OAuth2 client-credentials tokens for the Accenture GenAI gateway.
+    """Manages OAuth2 client-credentials tokens for the GenAI gateway.
 
     Token lifecycle:
         - Obtained via Azure AD client-credentials (application) flow.
