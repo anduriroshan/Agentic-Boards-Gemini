@@ -8,6 +8,10 @@ _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
+    # ── Google OAuth ──────────────────────────────────────────
+    google_client_id: str = Field(default="")
+    google_client_secret: str = Field(default="")
+    
     # ── LLM ───────────────────────────────────────────────────
     # Mode: "passthrough" (OpenAI-compatible, api-key auth)
     #       "custom"      (Custom proprietary ChatCompletion, OAuth2 token)

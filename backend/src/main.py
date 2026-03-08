@@ -27,10 +27,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from starlette.middleware.sessions import SessionMiddleware
+from src.api.routes_auth import router as auth_router
+from src.api.routes_workspace import router as workspace_router
+from src.db.session import init_db
+
+# Starlette session middleware is strictly required by Authlib for OAuth callback state tracking
+app.add_middleware(SessionMiddleware, secret_key="REPLACE_WITH_SECURE_SECRET_IN_PROD")
+
 app.include_router(health_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(databricks_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
+app.include_router(workspace_router, prefix="/api")
 
 # Serve frontend static files
 frontend_path = os.path.join(os.getcwd(), "frontend_dist")
@@ -59,7 +69,9 @@ def _load_embeddings():
 
 @app.on_event("startup")
 async def _startup():
-    """Pre-warm the embedding model so the first query is fast."""
+    """Pre-warm the embedding model so the first query is fast and init DB."""
+    init_db()
+    
     import asyncio
     import concurrent.futures
     loop = asyncio.get_event_loop()

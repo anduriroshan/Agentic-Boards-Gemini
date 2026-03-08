@@ -10,38 +10,64 @@ import { useChatStore } from "@/stores/chatStore";
 
 interface SessionState {
     sessions: SavedSession[];
-    refresh: () => void;
-    save: (name: string) => void;
-    load: (id: string) => void;
-    remove: (id: string) => void;
+    activeSessionId: string | null;
+    activeSessionName: string | null;
+    isLoading: boolean;
+    refresh: () => Promise<void>;
+    save: (name?: string) => Promise<void>;
+    load: (id: string) => Promise<void>;
+    remove: (id: string) => Promise<void>;
+    clearActive: () => void;
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
-    sessions: listSessions(),
+export const useSessionStore = create<SessionState>((set, get) => ({
+    sessions: [],
+    activeSessionId: null,
+    activeSessionName: null,
+    isLoading: false,
 
-    refresh: () => set({ sessions: listSessions() }),
+    refresh: async () => {
+        set({ isLoading: true });
+        try {
+            const sessions = await listSessions();
+            set({ sessions });
+        } finally {
+            set({ isLoading: false });
+        }
+    },
 
-    save: (name: string) => {
+    save: async (name?: string) => {
+        const { activeSessionId, activeSessionName } = get();
         const tiles = useDashboardStore.getState().tiles;
         const { messages, sessionId } = useChatStore.getState();
 
+        const finalName = name || activeSessionName || "Untitled Session";
+        const finalId = activeSessionId || crypto.randomUUID();
+
         const session: SavedSession = {
-            id: crypto.randomUUID(),
-            name,
+            id: finalId,
+            name: finalName,
             dashboard: { tiles },
             chat: { messages, sessionId },
             tileCount: tiles.length,
             savedAt: Date.now(),
         };
 
-        persistSession(session);
-        set({ sessions: listSessions() });
+        await persistSession(session);
+        const sessions = await listSessions();
+        set({
+            sessions,
+            activeSessionId: finalId,
+            activeSessionName: finalName
+        });
     },
 
-    load: (id: string) => {
-        const sessions = listSessions();
+    load: async (id: string) => {
+        const sessions = await listSessions();
         const session = sessions.find((s) => s.id === id);
         if (!session) return;
+
+        set({ activeSessionId: session.id, activeSessionName: session.name });
 
         // Restore dashboard
         const dashStore = useDashboardStore.getState();
@@ -73,8 +99,19 @@ export const useSessionStore = create<SessionState>((set) => ({
         });
     },
 
-    remove: (id: string) => {
-        removeSession(id);
-        set({ sessions: listSessions() });
+    remove: async (id: string) => {
+        const { activeSessionId } = get();
+        await removeSession(id);
+        const sessions = await listSessions();
+        const updates: any = { sessions };
+        if (activeSessionId === id) {
+            updates.activeSessionId = null;
+            updates.activeSessionName = null;
+        }
+        set(updates);
+    },
+
+    clearActive: () => {
+        set({ activeSessionId: null, activeSessionName: null });
     },
 }));

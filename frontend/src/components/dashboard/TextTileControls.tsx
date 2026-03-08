@@ -6,6 +6,7 @@ interface TextTileControlsProps {
 }
 
 const fontSizes = [
+    { label: "Extra Small", value: "text-xs" },
     { label: "Small", value: "text-sm" },
     { label: "Normal", value: "text-base" },
     { label: "Large", value: "text-lg" },

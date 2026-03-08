@@ -99,7 +99,6 @@ export default function TextTile({ data, onUpdate }: TextTileProps) {
         <div
             className={`h-full w-full overflow-y-auto p-4 group cursor-text ${data.fontSize || 'text-sm'} text-foreground/90 leading-relaxed`}
             onClick={() => setIsEditing(true)}
-            title="Click to edit"
         >
             {data.markdown ? (
                 <div dangerouslySetInnerHTML={parseMarkdown(data.markdown)} />

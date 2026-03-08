@@ -1,8 +1,6 @@
 import type { DashboardTile } from "@/types/dashboard";
 import type { Message } from "@/types/chat";
 
-const STORAGE_KEY = "agentic_boards_sessions";
-
 export interface SavedSession {
     id: string;
     name: string;
@@ -12,34 +10,44 @@ export interface SavedSession {
     savedAt: number;
 }
 
-export function listSessions(): SavedSession[] {
+export async function listSessions(): Promise<SavedSession[]> {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return [];
-        const sessions = JSON.parse(raw) as SavedSession[];
-        return sessions.sort((a, b) => b.savedAt - a.savedAt);
-    } catch {
+        const res = await fetch("/api/workspaces");
+        if (!res.ok) return [];
+        const sessions = await res.json() as SavedSession[];
+        return sessions; // already sorted descending by the backend
+    } catch (err) {
+        console.error("Failed to list workspaces", err);
         return [];
     }
 }
 
-export function saveSession(session: SavedSession): void {
-    const sessions = listSessions();
-    const idx = sessions.findIndex((s) => s.id === session.id);
-    if (idx >= 0) {
-        sessions[idx] = session;
-    } else {
-        sessions.unshift(session);
+export async function saveSession(session: SavedSession): Promise<void> {
+    try {
+        await fetch("/api/workspaces", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(session),
+        });
+    } catch (err) {
+        console.error("Failed to save workspace", err);
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
 }
 
-export function loadSession(id: string): SavedSession | null {
-    const sessions = listSessions();
+export async function loadSession(id: string): Promise<SavedSession | null> {
+    // To load a specific session, we re-fetch the list (could be optimized with a GET /api/workspaces/{id} later)
+    const sessions = await listSessions();
     return sessions.find((s) => s.id === id) ?? null;
 }
 
-export function deleteSession(id: string): void {
-    const sessions = listSessions().filter((s) => s.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+export async function deleteSession(id: string): Promise<void> {
+    try {
+        await fetch(`/api/workspaces/${id}`, {
+            method: "DELETE",
+        });
+    } catch (err) {
+        console.error("Failed to delete workspace", err);
+    }
 }
