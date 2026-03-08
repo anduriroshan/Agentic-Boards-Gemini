@@ -17,6 +17,12 @@ Every chart, table, and layout is generated on-demand. Agentic Boards provides a
 ### Real-Time Streaming & Transparency
 The platform leverages Server-Sent Events (SSE) to stream the agent's thought processes directly to the UI. The **Agent Activity Panel** provides a transparent, live view of the decision-making process, showing exactly how your question is being answered step-by-step.
 
+### 🔐 Secure Multi-User Access
+Agentic Boards now features full **Google OAuth 2.0 Integration**, allowing multiple users to sign in and maintain their own private environments.
+
+### 💾 Persistent Workspaces
+Unlike many BI tools that rely on temporary browser storage, Agentic Boards persists your **Dashboards and Chat History** in a backend SQLite database. This ensures your work is saved securely and follows you across different devices and browsers.
+
 ---
 
 ## 📊 Dashboard Capabilities
@@ -25,9 +31,10 @@ The Agentic Boards dashboard is designed to be highly interactive and customizab
 
 - **Dynamic Grid Layout:** A responsive, drag-and-drop 12-column grid layout lets you organize your insights exactly how you want.
 - **Interactive Visualizations:** Renders beautiful, responsive charts using Vega-Lite (bar, line, arc, etc.) and interactive data tables.
+- **Session Management:** Save, update, and manage multiple workspace sessions. Easily switch between different analytical contexts or start fresh with a "New Session".
 - **AI-Driven Modifications:** Want to change a chart? Just ask the AI to resize it, move it, change its type, or update its title.
-- **Contextual Reasoning:** The AI can answer analytical questions ("What are the key insights?") by reasoning over the data already present on the dashboard, without needing to re-query the database.
-- **Databricks Integration:** Features an easy-to-use settings modal to configure your connection, switch catalogs and schemas, and manage fallback tables on the fly.
+- **Contextual Reasoning:** The AI can answer analytical questions ("What are the key insights?") by reasoning over the data already present on the dashboard.
+- **Databricks Integration:** Features an easy-to-use settings modal to configure your connection, switch catalogs and schemas.
 
 ---
 
@@ -54,7 +61,9 @@ The **DashboardAgent** manages the spatial layout and presentation of your insig
 | Component | Technology |
 |---|---|
 | **Frontend** | React 19, TypeScript, Vite, Zustand, Vega-Lite, Tailwind CSS |
-| **Backend** | FastAPI (Python 3.13), LangGraph, LangChain |
+| **Backend** | FastAPI (Python 3.13), LangGraph, LangChain, SQLAlchemy |
+| **Authentication** | Google OAuth 2.0 (Authlib) |
+| **Database** | SQLite (for Users, Sessions, and Workspaces) |
 | **Data Warehouse** | Databricks (PySpark / Databricks Connect) |
 | **Vector Store & ML** | Milvus, `sentence-transformers` |
 
@@ -65,7 +74,10 @@ The **DashboardAgent** manages the spatial layout and presentation of your insig
 Agentic Boards uses a unified Docker Compose setup for quick deployment.
 
 1. Ensure Docker, Node.js (≥18), and Python (≥3.11) are installed.
-2. Duplicate `.env.example` to `backend/.env` and securely populate your authentication credentials and Databricks configuration.
+2. Duplicate `.env.example` to `backend/.env` and securely populate your credentials:
+   - **LLM Details:** Gemini API Key.
+   - **Google OAuth:** `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+   - **Databricks:** Host, Token, and Warehouse ID.
 3. Run the full stack:
    ```bash
    docker compose up --build
