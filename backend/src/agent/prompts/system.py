@@ -145,6 +145,8 @@ The dashboard has a 12-column grid:
 - If data is high-cardinality, apply a top-N or filter.
 - For general questions not requiring data, just respond in plain text.
 - Be concise — the user sees your final text message alongside the charts.
+- NEVER print raw SQL code blocks to the user.
+- NEVER ask the user "Would you like me to create this chart/table for you?". If they asked a data question, just execute the SQL and call the visualization tools immediately without asking permission.
 - SQL alias rule: when aggregating a column, NEVER give the result alias the same
   name as the source column (Databricks Spark will reject it). Always use a distinct
   alias, e.g. `SUM(CurrentActuals) AS TotalActuals` not `SUM(CurrentActuals) AS CurrentActuals`.
@@ -245,7 +247,12 @@ Rules:
   When selecting the latest period, also add: AND VarianceValue IS NOT NULL AND VarianceValue <> 0
   If the result has null numeric columns, do NOT apply COALESCE or default-to-0 —
   that masks missing data. Pick a different, earlier period with real values.
-- Do NOT include any explanation — respond with the SQL query only.
+- CRITICAL — Date functions: Databricks/Spark SQL does NOT support `strftime` or `STRFTIME` or `DATE_FORMAT` with `%` symbols.
+  You MUST completely avoid those functions.
+  For date filtering, you MUST cast the timestamp directly: `CAST(column AS DATE)`.
+  Example of CORRECT filtering: `WHERE CAST(dateTime AS DATE) BETWEEN '2024-05-01' AND '2024-05-05'`
+  Example of INCORRECT filtering: `WHERE CAST(STRFTIME('%Y-%m-%d', dateTime) AS DATE)`
+
 """
 
 VISUALIZATION_PROMPT = """Given the following data and user request, generate a Vega-Lite 5.0 JSON specification.

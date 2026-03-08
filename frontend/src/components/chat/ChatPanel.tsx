@@ -78,7 +78,15 @@ export default function ChatPanel({ collapsed = false, onToggle }: ChatPanelProp
     stopStreaming,
     newSession,
     sessionHistory,
+    availableModels,
+    selectedModel,
+    setSelectedModel,
+    fetchModels,
   } = useChatStore();
+
+  useEffect(() => {
+    fetchModels();
+  }, [fetchModels]);
 
   const [input, setInput] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -123,19 +131,36 @@ export default function ChatPanel({ collapsed = false, onToggle }: ChatPanelProp
           )}
         </button>
 
-        {/* right: New Chat button — doesn't toggle collapse */}
+        {/* right: controls — doesn't toggle collapse */}
         {!collapsed && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              newSession();
-            }}
-            title="New chat session"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors shrink-0 ml-1"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New Chat
-          </button>
+          <div className="flex items-center gap-1">
+            {availableModels.length > 0 && (
+              <select
+                className="text-xs bg-muted/50 text-muted-foreground border-none rounded px-1.5 py-1 outline-none cursor-pointer focus:ring-1 focus:ring-ring hover:bg-muted transition-colors max-w-[120px] truncate"
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                title="Select LLM Model"
+              >
+                {availableModels.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                newSession();
+              }}
+              title="New chat session"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New Chat
+            </button>
+          </div>
         )}
       </div>
 

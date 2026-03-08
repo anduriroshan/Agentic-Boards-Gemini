@@ -50,6 +50,7 @@ export async function sendChatMessage(
   handlers: SSEEventHandler,
   currentTiles?: TileContext[],
   chatHistory?: ChatHistoryItem[],
+  llmModel?: string | null,
   signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch(`${API_BASE}/chat`, {
@@ -58,6 +59,7 @@ export async function sendChatMessage(
     body: JSON.stringify({
       session_id: sessionId,
       message,
+      llm_model: llmModel,
       current_tiles: currentTiles ?? [],
       chat_history: chatHistory ?? [],
     }),

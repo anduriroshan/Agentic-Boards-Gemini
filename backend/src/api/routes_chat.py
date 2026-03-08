@@ -139,6 +139,7 @@ def _agent_step(step_id: str, phase: str, agent: str, icon: str,
 class ChatRequest(BaseModel):
     session_id: str | None = None
     message: str
+    llm_model: str | None = None
     current_tiles: list[dict] = []   # [{tile_id, title, vega_spec, layout}, ...]
     chat_history: list[dict] = []    # [{role, content}, ...]
 
@@ -476,6 +477,7 @@ async def _agent_event_generator(request: ChatRequest, http_request: HTTPRequest
                 "messages": history_messages + [HumanMessage(content=request.message)],
                 "current_tiles": request.current_tiles,
                 "chat_history": request.chat_history,
+                "llm_model": request.llm_model,
             }
 
             async for graph_event in agent_graph.astream(
@@ -563,3 +565,48 @@ async def chat(request: ChatRequest, http_request: HTTPRequest):
 async def chat_fallback(request: ChatRequest):
     """Fallback endpoint that works without LLM configuration."""
     return EventSourceResponse(_fallback_event_generator(request))
+
+
+@router.get("/chat/models")
+async def list_models():
+    """Return a list of available models based on LLM mode dynamically from providers."""
+    from src.config import settings
+    mode = settings.llm_mode.strip().lower()
+    
+    if mode == "gemini":
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=settings.gemini_api_key)
+            models = []
+            for m in genai.list_models():
+                if "generateContent" in m.supported_generation_methods:
+                    models.append(m.name.replace("models/", ""))
+            models.sort(reverse=True) # Usually newer models are alphabetically/numerically higher
+            if not models:
+                models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
+            return {"mode": "gemini", "models": models}
+        except Exception as e:
+            logger.warning("Failed to fetch dynamic Gemini models: %s", e)
+            return {"mode": "gemini", "models": ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"]}
+
+    elif mode == "openai":
+        try:
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url or None)
+            model_list = await client.models.list()
+            # Filter to likely chat models
+            models = [m.id for m in model_list.data if "gpt" in m.id or "o1" in m.id or "o3" in m.id]
+            models.sort(reverse=True)
+            if not models:
+                models = ["gpt-4o", "gpt-4-turbo", "gpt-4o-mini", "gpt-3.5-turbo"]
+            return {"mode": "openai", "models": models}
+        except Exception as e:
+            logger.warning("Failed to fetch dynamic OpenAI models: %s", e)
+            return {"mode": "openai", "models": ["gpt-4o", "gpt-4-turbo", "gpt-4o-mini", "gpt-3.5-turbo"]}
+            
+    elif mode == "passthrough":
+        return {
+            "mode": "passthrough",
+            "models": [settings.llm_model] # Gateway typically locks you to one deployment model name
+        }
+    return {"mode": mode, "models": ["default"]}

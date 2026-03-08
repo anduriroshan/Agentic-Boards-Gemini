@@ -178,8 +178,8 @@ export default function DashboardCanvas() {
     y: t.layout.y,
     w: t.layout.w,
     h: t.layout.h,
-    minW: 16,
-    minH: 12,
+    minW: 12,
+    minH: 6,
   }));
 
   // Sort tiles so the ones with higher z-index render later in the DOM

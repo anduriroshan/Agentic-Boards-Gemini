@@ -201,7 +201,7 @@ async def agent_node(state: AgentState) -> dict:
         logger.info("[AGENT] terminal tool already done — returning confirmation")
         return {"messages": [AIMessage(content=done_msg)]}
 
-    llm = get_llm().bind_tools(ALL_TOOLS)
+    llm = get_llm(state.get("llm_model")).bind_tools(ALL_TOOLS)
 
     system_prompt = _build_system_message(state)
 

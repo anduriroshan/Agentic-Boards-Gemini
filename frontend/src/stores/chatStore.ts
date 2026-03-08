@@ -19,6 +19,11 @@ interface ChatState {
   sessionHistory: SessionRecord[];
   abortController: AbortController | null;
 
+  availableModels: string[];
+  selectedModel: string;
+  setSelectedModel: (model: string) => void;
+  fetchModels: () => Promise<void>;
+
   newSession: () => void;
   stopStreaming: () => void;
   sendMessage: (content: string) => Promise<void>;
@@ -53,6 +58,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   thinkingMessage: null,
   sessionHistory: [],
   abortController: null,
+  availableModels: [],
+  selectedModel: "default",
   addVisualizationCallback: null,
   updateVisualizationCallback: null,
   updateLayoutCallback: null,
@@ -64,6 +71,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
   kpiTileCallback: null,
   textTileCallback: null,
   getTilesCallback: null,
+
+  setSelectedModel: (model: string) => set({ selectedModel: model }),
+  fetchModels: async () => {
+    try {
+      const res = await fetch("/api/chat/models");
+      if (res.ok) {
+        const data = await res.json();
+        set({ availableModels: data.models || [] });
+        if (data.models && data.models.length > 0) {
+          set({ selectedModel: data.models[0] });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch models", e);
+    }
+  },
 
   newSession: () => {
     const { messages, sessionId } = get();
@@ -208,6 +231,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
         currentTiles,
         chatHistory,
+        state.selectedModel,
         controller.signal,
       );
     } catch (error) {
