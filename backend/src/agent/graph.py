@@ -21,6 +21,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from src.agent.state import AgentState
 from src.agent.tools import ALL_TOOLS
 from src.agent.prompts.system import REACT_SYSTEM_PROMPT
+from src.agent.prompts.guardrail import GUARDRAIL_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +189,60 @@ def _viz_already_done(state_messages: list) -> str | None:
     return None
 
 
+async def guardrail_node(state: AgentState) -> dict:
+    """Classify the user's intent to ensure it is in scope for the project."""
+    from src.llm import get_llm
+
+    # Use a fast model for guardrails (defaulting to gemini-2.0-flash if possible)
+    llm = get_llm(state.get("llm_model"))
+    
+    last_message = state["messages"][-1].content
+    
+    prompt = [
+        SystemMessage(content=GUARDRAIL_SYSTEM_PROMPT),
+        HumanMessage(content=f"User Message: {last_message}")
+    ]
+    
+    try:
+        response = await llm.ainvoke(prompt)
+        content = response.content if isinstance(response.content, str) else str(response.content)
+        # Parse JSON from the response
+        import re
+        json_match = re.search(r"\{.*\}", content, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group())
+        else:
+            # Fallback if LLM doesn't return valid JSON
+            result = {"classification": "IN_SCOPE", "reason": "Failed to parse guardrail response"}
+    except Exception as e:
+        logger.error(f"[GUARDRAIL] Error: {e}")
+        result = {"classification": "IN_SCOPE", "reason": f"Error during guardrail: {e}"}
+
+    logger.info(f"[GUARDRAIL] classification={result.get('classification')} reason={result.get('reason')}")
+    
+    updates = {"guardrail_result": result}
+    
+    # If out of scope, add a refusal message to the state
+    if result.get("classification") == "OUT_OF_SCOPE":
+        refusal = AIMessage(
+            content=(
+                f"I'm sorry, but I can only help with data analysis, dashboards, and reporting tasks. "
+                f"Your request appears to be out of scope: {result.get('reason')}"
+            )
+        )
+        updates["messages"] = [refusal]
+        
+    return updates
+
+
+def should_continue_after_guardrail(state: AgentState) -> str:
+    """Route to agent if IN_SCOPE, otherwise END."""
+    res = state.get("guardrail_result") or {}
+    if res.get("classification") == "OUT_OF_SCOPE":
+        return END
+    return "agent"
+
+
 async def agent_node(state: AgentState) -> dict:
     """Call the LLM with tools bound.  Returns either a tool_call or a
     final text response (which ends the loop)."""
@@ -249,10 +304,14 @@ def build_agent_graph() -> StateGraph:
     """Build and compile the ReAct agent graph."""
     graph = StateGraph(AgentState)
 
+    graph.add_node("guardrail", guardrail_node)
     graph.add_node("agent", agent_node)
     graph.add_node("tools", ToolNode(ALL_TOOLS))
 
-    graph.set_entry_point("agent")
+    graph.set_entry_point("guardrail")
+
+    # Guardrail check
+    graph.add_conditional_edges("guardrail", should_continue_after_guardrail)
 
     # If the LLM emitted tool_calls → run ToolNode → loop back to agent
     # If the LLM emitted a plain text response → END

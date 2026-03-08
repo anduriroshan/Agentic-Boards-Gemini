@@ -59,7 +59,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessionHistory: [],
   abortController: null,
   availableModels: [],
-  selectedModel: "default",
+  selectedModel: "gemini-2.5-flash",
   addVisualizationCallback: null,
   updateVisualizationCallback: null,
   updateLayoutCallback: null,
@@ -80,7 +80,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const data = await res.json();
         set({ availableModels: data.models || [] });
         if (data.models && data.models.length > 0) {
-          set({ selectedModel: data.models[0] });
+          // If gemini-2.5-flash is in the list, keep it as selected.
+          // Otherwise, pick the first one if current selectedModel isn't in the list.
+          const hasGemini25 = data.models.includes("gemini-2.5-flash");
+          if (!hasGemini25 && !data.models.includes(get().selectedModel)) {
+            set({ selectedModel: data.models[0] });
+          } else if (hasGemini25) {
+            set({ selectedModel: "gemini-2.5-flash" });
+          }
         }
       }
     } catch (e) {

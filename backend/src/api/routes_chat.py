@@ -339,7 +339,30 @@ def _process_graph_event(
     """Convert one LangGraph node-update into a list of SSE event dicts."""
     events: list[dict] = []
 
-    if node_name == "agent":
+    if node_name == "guardrail":
+        for msg in node_output.get("messages", []):
+            if isinstance(msg, AIMessage) and msg.content:
+                content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                logger.info("[GUARDRAIL] refusal response len=%d", len(content))
+                events.append(_agent_step(
+                    step_id=f"{run_id}-guard", phase="final",
+                    agent="Orchestrator", icon="shield",
+                    summary="Security check: Out of scope",
+                    status="error",
+                ))
+                events.append({"event": "message", "data": json.dumps({"content": content})})
+        
+        # If it was IN_SCOPE, we might want to show a subtle "Security check: OK" or just nothing.
+        # Let's show a subtle update if it's NOT a refusal.
+        if not events:
+            events.append(_agent_step(
+                step_id=f"{run_id}-guard", phase="thinking",
+                agent="Orchestrator", icon="shield",
+                summary="Security check: OK",
+                status="done",
+            ))
+
+    elif node_name == "agent":
         for msg in node_output.get("messages", []):
             if not isinstance(msg, AIMessage):
                 continue
@@ -478,6 +501,7 @@ async def _agent_event_generator(request: ChatRequest, http_request: HTTPRequest
                 "current_tiles": request.current_tiles,
                 "chat_history": request.chat_history,
                 "llm_model": request.llm_model,
+                "guardrail_result": None,
             }
 
             async for graph_event in agent_graph.astream(

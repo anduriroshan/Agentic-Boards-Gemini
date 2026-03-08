@@ -111,6 +111,7 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
         httponly=False,
         max_age=7 * 24 * 3600,
         domain=".agentic-boards.live",
+        path="/",
         secure=True,
         samesite="lax",
     )

@@ -82,5 +82,5 @@ Agentic Boards uses a unified Docker Compose setup for quick deployment.
    ```bash
    docker compose up --build
    ```
-4. Access the unified application at `http://localhost:8000`.
+4. Access the unified application at `https://agentic-boards.live/`.
 
