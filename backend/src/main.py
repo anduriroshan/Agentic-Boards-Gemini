@@ -17,11 +17,20 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
 app = FastAPI(title="Agentic Boards", version="0.1.0")
+
+# Trust Cloudflare Tunnel headers (X-Forwarded-For, X-Forwarded-Proto, etc.)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://localhost:3000",
+        "https://agentic-boards.live"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

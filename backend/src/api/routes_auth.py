@@ -52,9 +52,9 @@ async def login_google(request: Request):
     if not oauth.google.client_id:
         raise HTTPException(status_code=500, detail="Google OAuth is not configured. Missing client ID.")
     
-    # We construct the exact redirect_uri using the exact string you configure in Google Cloud
     # It MUST exactly match your Authorized redirect URIs in GCP.
-    redirect_uri = "http://localhost:8000/api/auth/google/callback"
+    # We now use a setting so you can easily switch to agnetic-boards.live
+    redirect_uri = settings.google_redirect_uri or "http://localhost:8000/api/auth/google/callback"
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
@@ -101,15 +101,17 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
 
     # We want to redirect back to the Frontend (port 5173) and give it the token
     # A simple way is to pass it in a cookie and redirect to the frontend base url
-    frontend_url = "http://localhost:5173"
+    frontend_url = "https://agentic-boards.live"
     response = RedirectResponse(url=frontend_url)
     
     # Set HTTP-only cookie or just a standard accessible cookie for the UI
     response.set_cookie(
         key="session_token",
         value=token,
-        httponly=False, # false so React can read it or verify it exists
+        httponly=False,
         max_age=7 * 24 * 3600,
+        domain=".agentic-boards.live",
+        secure=True,
         samesite="lax",
     )
     return response
@@ -117,6 +119,8 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
 @router.get("/auth/me")
 async def get_current_user_info(request: Request, db: Session = Depends(get_db)):
     """Return logged in user info"""
+    # Debug logging for cookies
+    logger.info(f"Cookies received: {request.cookies}")
     token = request.cookies.get("session_token")
     if not token:
         # Fallback to Authorization Bearer token header if cookie not used

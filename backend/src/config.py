@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # ── Google OAuth ──────────────────────────────────────────
     google_client_id: str = Field(default="")
     google_client_secret: str = Field(default="")
+    google_redirect_uri: str = Field(default="")
     
     # ── LLM ───────────────────────────────────────────────────
     # Mode: "passthrough" (OpenAI-compatible, api-key auth)
