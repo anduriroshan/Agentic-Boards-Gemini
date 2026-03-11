@@ -5,7 +5,8 @@ FROM ghcr.io/astral-sh/uv:latest AS uv_bin
 FROM node:20-slim AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -24,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy backend requirements and install with uv
 COPY backend/pyproject.toml ./backend/
-RUN uv pip install --no-cache-dir --system ./backend/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --no-cache-dir --system ./backend/
 
 # Copy backend source
 COPY backend/src ./src
@@ -39,5 +41,5 @@ ENV PORT=8000
 # Expose the combined port
 EXPOSE 8000
 
-# Start the application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start the application using dynamic PORT
+CMD uvicorn src.main:app --host 0.0.0.0 --port ${PORT}

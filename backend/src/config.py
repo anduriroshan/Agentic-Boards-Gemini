@@ -59,10 +59,16 @@ class Settings(BaseSettings):
         description="Comma-separated list of tables to index into Milvus",
     )
 
-    # Milvus
-    milvus_host: str = Field(default="localhost")
-    milvus_port: int = Field(default=19530)
-    milvus_enabled: bool = Field(default=False)
+    # Milvus / Zilliz Cloud
+    milvus_uri: str = Field(
+        default="./milvus_data.db",
+        description="Connect URI. Use a local file path for Milvus Lite (FREE), or Zilliz Cloud URL."
+    )
+    milvus_token: str = Field(
+        default="",
+        description="API key/token for Zilliz Cloud. Leave empty for local Milvus Lite."
+    )
+    milvus_enabled: bool = Field(default=True)
 
     # Cube.js
     cubejs_api_url: str = Field(default="http://localhost:4000/cubejs-api/v1")
@@ -72,7 +78,11 @@ class Settings(BaseSettings):
     backend_port: int = Field(default=8000)
     database_url: str = Field(default="sqlite+aiosqlite:///./agentic_bi.db")
 
-    model_config = {"env_file": str(_ENV_FILE), "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_file": str(_ENV_FILE),
+        "env_file_encoding": "utf-8",
+        "extra": "ignore"
+    }
 
 
 settings = Settings()

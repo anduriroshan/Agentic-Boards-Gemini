@@ -208,6 +208,7 @@ __marimo__/
 
 # Python
 __pycache__/
+__pycache__
 *.py[cod]
 *$py.class
 *.egg-info/

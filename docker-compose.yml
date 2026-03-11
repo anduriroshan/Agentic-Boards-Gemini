@@ -4,21 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
-    env_file: ./backend/.env
-    depends_on:
-      - milvus
-
-  milvus:
-    image: milvusdb/milvus:v2.4.23
-    ports:
-      - "127.0.0.1:19530:19530"
-      - "127.0.0.1:9091:9091"
+      - "${PORT:-8000}:8000"
     environment:
-      ETCD_USE_EMBED: "true"
-      COMMON_STORAGETYPE: "local"
-    volumes:
-      - milvus_data:/var/lib/milvus
-
-volumes:
-  milvus_data:
+      - PORT=8000
+    env_file: ./backend/.env

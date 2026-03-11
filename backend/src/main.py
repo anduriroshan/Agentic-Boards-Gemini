@@ -19,30 +19,35 @@ logging.basicConfig(
 
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-app = FastAPI(title="Agentic Boards", version="0.1.0")
-
-# Trust Cloudflare Tunnel headers (X-Forwarded-For, X-Forwarded-Proto, etc.)
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", 
-        "http://localhost:3000",
-        "https://agentic-boards.live"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 from starlette.middleware.sessions import SessionMiddleware
 from src.api.routes_auth import router as auth_router
 from src.api.routes_workspace import router as workspace_router
 from src.db.session import init_db
 
+app = FastAPI(title="Agentic Boards", version="0.1.0")
+
+# Trust Cloudflare/AWS Load Balancer headers
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+# Production CORS
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://agentic-boards.live"
+]
+if os.getenv("ALLOWED_ORIGINS"):
+    allowed_origins.extend(os.getenv("ALLOWED_ORIGINS").split(","))
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Starlette session middleware is strictly required by Authlib for OAuth callback state tracking
-app.add_middleware(SessionMiddleware, secret_key="REPLACE_WITH_SECURE_SECRET_IN_PROD")
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET", "REPLACE_WITH_SECURE_SECRET_IN_PROD"))
 
 app.include_router(health_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
@@ -51,19 +56,23 @@ app.include_router(databricks_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
 app.include_router(workspace_router, prefix="/api")
 
-# Serve frontend static files
+# Serve frontend static files (SPA compatible)
 frontend_path = os.path.join(os.getcwd(), "frontend_dist")
 if os.path.exists(frontend_path):
+    # Mount assets folder for direct access (JS, CSS, Images)
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        if full_path.startswith("api"):
-            return None # Should be handled by routers
+        # API routes are handled by routers, but let's be explicit
+        if full_path.startswith("api/"):
+            return None
         
         file_path = os.path.join(frontend_path, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
+        
+        # Fallback to index.html for Single Page Application (SPA) routing
         return FileResponse(os.path.join(frontend_path, "index.html"))
 
 
