@@ -62,14 +62,30 @@ exit
 
 The easiest way to get SSL is using **Caddy** as a reverse proxy.
 
-1.  Install Caddy on the EC2 host.
-2.  Set up your Caddyfile:
+1.  **Install Caddy** on the EC2 host:
+    ```bash
+    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+    curl -1G 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1G 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+    sudo apt update
+    sudo apt install caddy
     ```
-    your-domain.com {
+
+2.  **Edit the Caddyfile**:
+    ```bash
+    sudo nano /etc/caddy/Caddyfile
+    ```
+    Replace the contents with:
+    ```
+    agentic-boards.live {
         reverse_proxy localhost:8000
     }
     ```
-3.  Caddy will automatically handle SSL certificates via Let's Encrypt.
+
+3.  **Restart Caddy**:
+    ```bash
+    sudo systemctl restart caddy
+    ```
 
 ## Troubleshooting
 
