@@ -221,7 +221,7 @@ build/
 .venv/
 venv/
 env/
-
+AWS_DEPLOYMENT.md
 # Node
 node_modules/
 frontend/dist/

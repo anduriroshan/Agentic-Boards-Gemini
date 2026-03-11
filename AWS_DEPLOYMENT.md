@@ -25,12 +25,12 @@ chmod 400 agenticboards.pem
 ssh -i agenticboards.pem ubuntu@your-ec2-ip
 ```
 
-Install Docker:
+Install Docker and BuildKit plugin:
 ```bash
 sudo apt-get update
-sudo apt-get install -y docker.io
+sudo apt-get install -y docker.io docker-buildx
 sudo usermod -aG docker ubuntu
-# Log out and log back in for group changes to take effect
+# IMPORTANT: Log out and log back in for group changes to take effect
 exit
 ```
 
@@ -43,17 +43,20 @@ exit
     ```
 
 2.  **Configure Environment Variables**:
-    Create a `.env` file in the root directory:
+    Create a `.env` file in the **root** `Agentic-Boards` directory:
     ```bash
-    cp .env.example .env
-    nano .env
+    # If you created it in backend/, copy it to root:
+    cp backend/.env .env
     ```
     Ensure you set:
     *   `LLM_API_KEY`: Your Gemini/OpenAI key.
-    *   `MILVUS_URI`: `./milvus_data.db` (This uses Milvus Lite for FREE).
+    *   `MILVUS_URI`: `./milvus_data.db`
 
 3.  **Start the container**:
     ```bash
+    # Enable BuildKit for caching support
+    export DOCKER_BUILDKIT=1
+
     docker build -t agentic-boards .
     docker run -d --name app -p 8000:8000 --env-file .env agentic-boards
     ```
