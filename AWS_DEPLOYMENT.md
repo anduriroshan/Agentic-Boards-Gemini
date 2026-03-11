@@ -1,6 +1,9 @@
 # AWS Deployment Guide (EC2 + Docker Compose)
 
-This guide explains how to deploy Agentic Boards to an AWS EC2 instance. This setup is optimized for a single-container deployment using **Milvus Lite**, which runs on a **t3.micro** (1GB RAM) or **t3.small** (2GB RAM) instance, saving significantly on costs.
+This guide explains how to deploy Agentic Boards to an AWS EC2 instance. This setup is optimized for a single-container deployment using **Milvus Lite**.
+
+> [!IMPORTANT]
+> Because the build process installs large dependencies like `pyarrow` and `node_modules`, we recommend a **t3.small** instance (2GB RAM) with at least **20GB of EBS storage** to avoid "No space left on device" errors during the build.
 
 ## 1. Launch an EC2 Instance
 
@@ -8,12 +11,12 @@ This guide explains how to deploy Agentic Boards to an AWS EC2 instance. This se
 2.  Go to **EC2** -> **Instances** -> **Launch Instances**.
 3.  **Name**: `Agentic-Boards-Server`
 4.  **OS**: **Ubuntu 24.04 LTS** (64-bit x86).
-5.  **Instance Type**: Choose **t3.micro** (Free Tier eligible) or **t3.small** for better performance.
-6.  **Key Pair**: Create or select an existing `.pem` key for SSH access.
-7.  **Network Settings**:
+5.  **Instance Type**: Choose **t3.small** (2GB RAM).
+6.  **Storage (Configure Storage)**: Change the root volume size to **20 GiB**.
+7.  **Key Pair**: Create or select an existing `.pem` key for SSH access.
+8.  **Network Settings**:
     *   Allow **SSH** (Port 22).
     *   Allow **HTTP** (Port 80) and **HTTPS** (Port 443).
-    *   Allow Custom TCP **8000** (Optional, for direct testing).
 
 ## 2. Prepare the Server
 

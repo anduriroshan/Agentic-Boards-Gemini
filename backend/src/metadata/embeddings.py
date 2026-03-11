@@ -1,49 +1,44 @@
-"""Local embedding model using sentence-transformers.
+"""Google Gemini embedding model for fast, serverless vector generation.
 
-Uses all-MiniLM-L6-v2 (~80MB) for fast, offline vector generation.
-Loaded lazily on first call to avoid startup cost if not needed.
+Uses Google's text-embedding-004 model. This avoids installing 
+massive local libraries like torch and sentence-transformers.
 """
 
 import logging
-from functools import lru_cache
+from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-_model = None
+_embeddings = None
 
-
-def _get_model():
-    """Lazy-load the sentence-transformers model."""
-    global _model
-    if _model is None:
+def _get_embeddings():
+    """Lazy-load the Google embeddings client."""
+    global _embeddings
+    if _embeddings is None:
         try:
-            from sentence_transformers import SentenceTransformer
-
-            logger.info("Loading embedding model: all-MiniLM-L6-v2 ...")
-            _model = SentenceTransformer("all-MiniLM-L6-v2")
-            logger.info("Embedding model loaded.")
+            from langchain_google_genai import GoogleGenerativeAIEmbeddings
+            
+            logger.info("Initializing Google Gemini Embeddings...")
+            _embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/text-embedding-004",
+                google_api_key=settings.gemini_api_key
+            )
         except ImportError:
             raise RuntimeError(
-                "sentence-transformers is required for embeddings. "
-                "Install it with: pip install sentence-transformers"
+                "langchain-google-genai is required. "
+                "Install it with: pip install langchain-google-genai"
             )
-    return _model
-
+    return _embeddings
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Generate embeddings for a list of texts.
-
-    Returns a list of float vectors (384 dimensions for MiniLM-L6-v2).
-    """
-    model = _get_model()
-    embeddings = model.encode(texts, normalize_embeddings=True)
-    return embeddings.tolist()
-
+    """Generate embeddings for a list of texts using Gemini API."""
+    client = _get_embeddings()
+    return client.embed_documents(texts)
 
 def embed_query(text: str) -> list[float]:
-    """Generate an embedding for a single query string."""
-    return embed_texts([text])[0]
+    """Generate an embedding for a single query string using Gemini API."""
+    client = _get_embeddings()
+    return client.embed_query(text)
 
-
-# Dimension of the embedding vectors (all-MiniLM-L6-v2)
-EMBEDDING_DIM = 384
+# Dimension for text-embedding-004 is 768 by default
+EMBEDDING_DIM = 768
