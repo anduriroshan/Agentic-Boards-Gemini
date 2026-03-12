@@ -21,58 +21,14 @@ interface DashboardState {
   clearDashboard: () => void;
 }
 
-// Helper to find the next available position for a new tile
-// This replaces the global nextCol/nextRow logic for more robust placement
+// Helper to find the next available position for a new tile.
+// Simple strategy: place below the lowest existing tile.
 function getNextPosition(currentTiles: DashboardTile[]): { x: number; y: number } {
-  const GRID_COLS = 96; // 96-column grid for extreme precision
-  const DEFAULT_TILE_WIDTH = 48;
-  const DEFAULT_TILE_HEIGHT = 32;
-
-  let maxY = 0;
-  if (currentTiles.length > 0) {
-    maxY = Math.max(...currentTiles.map(tile => tile.layout.y + tile.layout.h));
+  if (currentTiles.length === 0) {
+    return { x: 0, y: 0 };
   }
-
-  // Simple placement: try to place in the first available spot in the next row
-  // or append to the right if space allows.
-  // For simplicity, let's just stack them for now, or find the lowest available spot.
-  // A more sophisticated algorithm would check for overlaps.
-  let nextX = 0;
-  let nextY = maxY;
-
-  // Find the lowest point in the grid and place the new tile there,
-  // or in the next available spot in the current row if it fits.
-  // This is a basic implementation; a real layout engine would be more complex.
-  let foundSpot = false;
-  for (let y = 0; y <= maxY + DEFAULT_TILE_HEIGHT; y += 1) { // Check rows
-    for (let x = 0; x <= GRID_COLS - DEFAULT_TILE_WIDTH; x += 1) { // Check columns
-      const potentialLayout = { x, y, w: DEFAULT_TILE_WIDTH, h: DEFAULT_TILE_HEIGHT };
-      const overlaps = currentTiles.some(tile => {
-        const existingLayout = tile.layout;
-        return !(
-          potentialLayout.x + potentialLayout.w <= existingLayout.x ||
-          potentialLayout.x >= existingLayout.x + existingLayout.w ||
-          potentialLayout.y + potentialLayout.h <= existingLayout.y ||
-          potentialLayout.y >= existingLayout.y + existingLayout.h
-        );
-      });
-      if (!overlaps) {
-        nextX = x;
-        nextY = y;
-        foundSpot = true;
-        break;
-      }
-    }
-    if (foundSpot) break;
-  }
-
-  if (!foundSpot) {
-    // If no spot found, just place it at the end of the current max Y
-    nextX = 0;
-    nextY = maxY + 1; // Place it below the lowest tile
-  }
-
-  return { x: nextX, y: nextY };
+  const maxY = Math.max(...currentTiles.map((tile) => tile.layout.y + tile.layout.h));
+  return { x: 0, y: maxY + 1 };
 }
 
 

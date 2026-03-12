@@ -77,6 +77,8 @@ export async function sendChatMessage(
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let currentEvent = "";
+  let currentData = "";
 
   while (true) {
     const { done, value } = await reader.read();
@@ -85,9 +87,6 @@ export async function sendChatMessage(
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
-
-    let currentEvent = "";
-    let currentData = "";
 
     for (const rawLine of lines) {
       const line = rawLine.replace(/\r$/, ""); // strip \r for \r\n line endings

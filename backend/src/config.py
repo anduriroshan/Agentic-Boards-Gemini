@@ -61,7 +61,7 @@ class Settings(BaseSettings):
 
     # Milvus / Zilliz Cloud
     milvus_uri: str = Field(
-        default="./milvus_data.db",
+        default="./data/milvus_data.db",
         description="Connect URI. Use a local file path for Milvus Lite (FREE), or Zilliz Cloud URL."
     )
     milvus_token: str = Field(
@@ -76,7 +76,7 @@ class Settings(BaseSettings):
 
     # Backend
     backend_port: int = Field(default=8000)
-    database_url: str = Field(default="sqlite+aiosqlite:///./agentic_bi.db")
+    database_url: str = Field(default="sqlite+aiosqlite:///./data/agentic_bi.db")
 
     model_config = {
         "env_file": str(_ENV_FILE),

@@ -3,7 +3,7 @@ import React from 'react';
 const Login: React.FC = () => {
     const handleGoogleLogin = () => {
         // Redirect to the backend OAuth initialization route
-        window.location.href = 'https://api.agentic-boards.live/api/auth/google/login';
+        window.location.href = '/api/auth/google/login';
     };
 
     return (
