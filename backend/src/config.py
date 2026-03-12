@@ -14,28 +14,8 @@ class Settings(BaseSettings):
     google_redirect_uri: str = Field(default="")
     
     # ── LLM ───────────────────────────────────────────────────
-    # Mode: "passthrough" (OpenAI-compatible, api-key auth)
-    #       "custom"      (Custom proprietary ChatCompletion, OAuth2 token)
-    llm_mode: str = Field(default="passthrough")
-
-    # Pass-through mode settings (OpenAI-compatible)
-    llm_api_key: str = Field(default="")
-    llm_base_url: str = Field(default="")
-    llm_model: str = Field(default="gpt-4.1-mini")
-
-    # Custom mode settings (Proprietary endpoint, Azure AD OAuth2)
-    llm_tenant_id: str = Field(default="")
-    llm_client_id: str = Field(default="")
-    llm_client_secret: str = Field(default="")
-    llm_auth_scope: str = Field(default="")
-    llm_api_url: str = Field(default="")
-    llm_user_id: str = Field(default="")
-    llm_system_context: str = Field(
-        default=(
-            "You are a financial analyst AI assistant specialising in variance analysis. "
-            "Provide concise, accurate, and actionable insights based on the financial data provided."
-        ),
-    )
+    # Mode: "openai" or "gemini"
+    llm_mode: str = Field(default="gemini")
 
     # OpenAI direct mode settings  (LLM_MODE=openai)
     openai_api_key: str = Field(default="")
@@ -65,6 +45,13 @@ class Settings(BaseSettings):
     databricks_index_tables: str = Field(
         default="variance.analysis_v2.gold_variancesummary_03,variance.analysis_v2.coa_hierarchy",
         description="Comma-separated list of tables to index into Milvus",
+    )
+
+    # BigQuery
+    bigquery_project_id: str = Field(default="", description="GCP Project ID for BigQuery")
+    bigquery_default_table: str = Field(
+        default="agentic-boards.iowa_liquor_retail_sales.sales",
+        description="Default BigQuery table for the agent to use"
     )
 
     # Milvus / Zilliz Cloud

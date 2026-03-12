@@ -628,9 +628,4 @@ async def list_models():
             logger.warning("Failed to fetch dynamic OpenAI models: %s", e)
             return {"mode": "openai", "models": ["gpt-4o", "gpt-4-turbo", "gpt-4o-mini", "gpt-3.5-turbo"]}
             
-    elif mode == "passthrough":
-        return {
-            "mode": "passthrough",
-            "models": [settings.llm_model] # Gateway typically locks you to one deployment model name
-        }
     return {"mode": mode, "models": ["default"]}

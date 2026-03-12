@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from src.agent.tools import (
     search_metadata as legacy_search_metadata,
     execute_sql as legacy_execute_sql,
+    execute_bigquery as legacy_execute_bigquery,
     create_visualization as legacy_create_visualization,
     create_kpi_tile as legacy_create_kpi_tile,
     create_data_table as legacy_create_data_table,
@@ -44,6 +45,13 @@ def execute_sql(
 ) -> str:
     """Execute a SQL query on the Databricks warehouse and return the result rows."""
     return legacy_execute_sql.invoke({"sql": sql})
+
+@adk.tool
+def execute_bigquery(
+    sql: Annotated[str, "A valid BigQuery SQL query (standard SQL)."]
+) -> str:
+    """Execute a SQL query on Google BigQuery and return the result rows."""
+    return legacy_execute_bigquery.invoke({"sql": sql})
 
 @adk.tool
 def create_visualization(
@@ -137,6 +145,7 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty."):
         tools=[
             search_metadata,
             execute_sql,
+            execute_bigquery,
             create_visualization,
             create_kpi_tile,
             create_data_table,

@@ -82,8 +82,19 @@ def _get_fallback_metadata() -> list[dict]:
             "table": table,
             "measures": [],
             "dimensions": [],
-            "description": f"Default table. Run POST /api/databricks/reindex to index full schema.",
+            "description": f"Default Databricks table.",
         })
+    
+    from src.config import settings
+    if settings.bigquery_default_table:
+        bq_table = settings.bigquery_default_table
+        entries.append({
+            "cube": bq_table.split(".")[-1],
+            "table": bq_table,
+            "type": "bigquery",
+            "description": "Default BigQuery table. Use execute_bigquery tool for this.",
+        })
+
     if catalog and schema:
         entries.append({
             "hint": f"Browse all tables: SELECT * FROM information_schema.tables WHERE table_catalog='{catalog}' AND table_schema='{schema}'",
@@ -236,6 +247,31 @@ def _hits_to_metadata(hits: list[dict]) -> list[dict]:
 class ExecuteSQLInput(BaseModel):
     """Input for the execute_sql tool."""
     sql: str = Field(description="A valid Databricks SQL query using fully-qualified table names (catalog.schema.table). Must include LIMIT unless doing aggregation.")
+
+
+class ExecuteBigQueryInput(BaseModel):
+    """Input for the execute_bigquery tool."""
+    sql: str = Field(description="A valid Google BigQuery SQL query (standard SQL). Use backticks for table names. Must include LIMIT unless doing aggregation.")
+
+
+@tool("execute_bigquery", args_schema=ExecuteBigQueryInput)
+def execute_bigquery(sql: str) -> str:
+    """Execute a SQL query on Google BigQuery and return the result rows.
+    
+    Use this for BigQuery tables (e.g. agentic-boards.iowa_liquor_retail_sales.sales).
+    Standard SQL syntax is required.
+    """
+    from src.bigquery.client import get_bigquery_manager
+    bq = get_bigquery_manager()
+    
+    try:
+        logger.info("[TOOL:execute_bigquery] %s", sql[:200])
+        pdf = bq.query_pandas(sql)
+        rows = pdf.to_dict(orient="records")
+        return _safe_json_dumps({"rows": rows, "row_count": len(rows)})
+    except Exception as e:
+        logger.error("[TOOL:execute_bigquery] failed: %s", e)
+        return _safe_json_dumps({"error": str(e), "rows": []})
 
 
 @tool("execute_sql", args_schema=ExecuteSQLInput)
@@ -703,6 +739,7 @@ def create_text_tile(title: str, markdown: str) -> str:
 ALL_TOOLS = [
     search_metadata,
     execute_sql,
+    execute_bigquery,
     create_visualization,
     create_kpi_tile,
     create_data_table,

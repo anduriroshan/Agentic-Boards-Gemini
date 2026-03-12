@@ -8,8 +8,8 @@ Verifies each layer independently:
   Step 2 — LLM invoke (does it return a response?)
 
 Supports both modes:
-  passthrough  — OpenAI-compatible endpoint, api-key auth
-  custom       — Custom proprietary ChatCompletion, OAuth2
+  openai       — Standard OpenAI API
+  gemini       — Google Gemini API via langchain-google-genai
 
 Usage:
     cd backend
@@ -47,25 +47,7 @@ def test_config() -> bool:
 
     all_ok = True
 
-    if mode == "passthrough":
-        checks = {
-            "LLM_API_KEY": settings.llm_api_key,
-            "LLM_BASE_URL": settings.llm_base_url,
-            "LLM_MODEL": settings.llm_model,
-            "LLM_TENANT_ID": settings.llm_tenant_id,
-            "LLM_CLIENT_ID": settings.llm_client_id,
-            "LLM_CLIENT_SECRET": settings.llm_client_secret,
-        }
-    elif mode == "custom":
-        checks = {
-            "LLM_TENANT_ID": settings.llm_tenant_id,
-            "LLM_CLIENT_ID": settings.llm_client_id,
-            "LLM_CLIENT_SECRET": settings.llm_client_secret,
-            "LLM_AUTH_SCOPE": settings.llm_auth_scope,
-            "LLM_API_URL": settings.llm_api_url,
-            "LLM_USER_ID": settings.llm_user_id,
-        }
-    elif mode == "openai":
+    if mode == "openai":
         checks = {
             "OPENAI_API_KEY": settings.openai_api_key,
             "OPENAI_MODEL": settings.openai_model,

@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 # ── Hardcoded fallback (used when Milvus is disabled) ────────────────────────
 FALLBACK_METADATA = [
     {
-        "cube": "gold_variancesummary_03",
-        "table": "variance.analysis_v2.gold_variancesummary_03",
+        "cube": "sales_transactions",
+        "table": "sample.bakehouse.sales_transactions",
         "measures": [],
         "dimensions": [],
         "description": "Variance summary (fallback – run index_databricks_metadata to populate Milvus)",
@@ -23,6 +23,14 @@ FALLBACK_METADATA = [
         "measures": [],
         "dimensions": [],
         "description": "COA hierarchy (fallback – run index_databricks_metadata to populate Milvus)",
+    },
+    {
+        "cube": "sales",
+        "table": "agentic-boards.iowa_liquor_retail_sales.sales",
+        "type": "bigquery",
+        "measures": [],
+        "dimensions": [],
+        "description": "Iowa liquor retail sales (BigQuery)",
     },
 ]
 

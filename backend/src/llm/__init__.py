@@ -2,10 +2,8 @@
 LLM module — factory function ``get_llm()`` returns the right
 LangChain chat model based on ``LLM_MODE`` in your .env:
 
-  - **passthrough** (default): OpenAI-compatible endpoint, api-key auth only.
-    Uses ``langchain_openai.ChatOpenAI``.
-  - **custom**: Proprietary ChatCompletion endpoint with Azure AD
-    OAuth2 token. Uses ``GatewayChatModel``.
+  - **openai**: Standard OpenAI API.
+  - **gemini**: Google Gemini API via langchain-google-genai.
 
 All agent nodes should import ``get_llm`` instead of a concrete class.
 """
@@ -30,77 +28,17 @@ __all__ = ["get_llm"]
 def get_llm(requested_model: str | None = None) -> BaseChatModel:
     """Return a LangChain chat model configured from environment variables."""
     mode = settings.llm_mode.strip().lower()
-
-    if mode == "passthrough":
-        return _build_passthrough()
-    elif mode == "custom":
-        return _build_custom()
-    elif mode == "openai":
+    if mode == "openai":
         return _build_openai(requested_model)
     elif mode == "gemini":
         return _build_gemini(requested_model)
     else:
         raise ValueError(
             f"Unknown LLM_MODE='{settings.llm_mode}'. "
-            "Expected 'passthrough', 'custom', 'openai', or 'gemini'."
+            "Expected 'openai' or 'gemini'."
         )
 
 
-def _build_passthrough() -> BaseChatModel:
-    """Azure OpenAI-compatible endpoint via GenAI gateway.
-
-    URL pattern:
-        {base_url}/openai/deployments/{model}/chat/completions?api-version=...
-
-    Auth: Bearer token (OAuth2, auto-refreshed) + api-key header.
-    """
-    from langchain_openai import AzureChatOpenAI
-    from src.llm.auth import TokenManager
-
-    if not settings.llm_api_key:
-        raise RuntimeError(
-            "LLM_API_KEY is not set. "
-            "Set it in backend/.env for passthrough mode."
-        )
-
-    # TokenManager caches & auto-refreshes the OAuth2 token
-    token_manager = TokenManager()
-
-    logger.info(
-        "LLM mode=passthrough  model=%s  base_url=%s",
-        settings.llm_model,
-        settings.llm_base_url,
-    )
-
-    import httpx
-
-    # httpx >= 0.28 dropped the `proxies` kwarg that the openai SDK was
-    # passing internally, causing a TypeError.  Supplying a pre-built
-    # client bypasses that code path entirely.
-    http_client = httpx.Client()
-    async_http_client = httpx.AsyncClient()
-
-    return AzureChatOpenAI(
-        azure_endpoint=settings.llm_base_url,
-        azure_deployment=settings.llm_model,
-        api_version="2024-02-01",
-        azure_ad_token_provider=token_manager.get_token,
-        temperature=1,  # GPT-5 only supports the default value of 1
-        default_headers={
-            "api-key": settings.llm_api_key,
-            "X-UserId": settings.llm_user_id,
-        },
-        http_client=http_client,
-        http_async_client=async_http_client,
-    )
-
-
-def _build_custom() -> BaseChatModel:
-    """Proprietary ChatCompletion + Azure AD OAuth2."""
-    from src.llm.langchain_wrapper import GatewayChatModel
-
-    logger.info("LLM mode=custom  url=%s", settings.llm_api_url[:80])
-    return GatewayChatModel()
 
 
 def _build_openai(requested_model: str | None = None) -> BaseChatModel:

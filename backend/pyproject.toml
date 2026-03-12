@@ -8,6 +8,9 @@ requires-python = ">=3.11"
 dependencies = [
     "google-adk",
     "google-cloud-aiplatform",
+    "google-cloud-bigquery",
+    "pandas-gbq",
+    "db-dtypes",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "httpx>=0.28.0",
