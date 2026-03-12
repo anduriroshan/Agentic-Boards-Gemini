@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field(default="")
     gemini_model: str = Field(default="gemini-2.0-flash")
 
+    # ── Vertex AI / Google Cloud ──────────────────────────────
+    gcp_project_id: str = Field(default="", description="Google Cloud Project ID")
+    gcp_region: str = Field(default="us-central1", description="Vertex AI Region")
+    google_application_credentials: str = Field(
+        default="", 
+        description="Path to GCP service account JSON key (optional if running on GCP)"
+    )
+
     # Databricks
     databricks_host: str = Field(default="")
     databricks_http_path: str = Field(default="")

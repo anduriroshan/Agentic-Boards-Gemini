@@ -10,6 +10,7 @@ import DashboardCanvas from "@/components/dashboard/DashboardCanvas";
 import AgentActivity from "@/components/activity/AgentActivity";
 import DatabricksSettings from "@/components/databricks/DatabricksSettings";
 import SessionsPanel from "@/components/sessions/SessionsPanel";
+import LiveAgent from "@/components/chat/LiveAgent";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -136,6 +137,7 @@ export default function AppShell() {
           </div>
         </Panel>
       </PanelGroup>
+      <LiveAgent />
     </div>
   );
 }
