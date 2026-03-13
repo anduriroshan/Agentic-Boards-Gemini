@@ -376,9 +376,14 @@ def _process_graph_event(
                     status="done",
                 ))
                 for tc in msg.tool_calls:
-                    # Track SQL from execute_sql for live chart support
-                    if stream_ctx is not None and tc["name"] == "execute_sql":
-                        stream_ctx["last_sql"] = tc.get("args", {}).get("sql")
+                    # Track SQL from execute_sql or execute_bigquery for live chart support
+                    if stream_ctx is not None:
+                        if tc["name"] == "execute_sql":
+                            stream_ctx["last_sql"] = tc.get("args", {}).get("sql")
+                            stream_ctx["last_tool"] = "execute_sql"
+                        elif tc["name"] == "execute_bigquery":
+                            stream_ctx["last_sql"] = tc.get("args", {}).get("sql")
+                            stream_ctx["last_tool"] = "execute_bigquery"
                     agent_name, icon = _TOOL_AGENT.get(tc["name"], ("Agent", "cpu"))
                     call_start[tc["id"]] = time.time()
                     events.append(_agent_step(
@@ -449,6 +454,7 @@ def _process_graph_event(
                             evt_data["query_meta"] = {
                                 "sql": stream_ctx["last_sql"],
                                 "params": detect_sql_params(stream_ctx["last_sql"]),
+                                "type": "bigquery" if stream_ctx.get("last_tool") == "execute_bigquery" else "databricks"
                             }
                             evt["data"] = json.dumps(evt_data)
                         except (json.JSONDecodeError, KeyError):
@@ -598,20 +604,43 @@ async def list_models():
     mode = settings.llm_mode.strip().lower()
     
     if mode == "gemini":
+        # 1. Use Vertex AI if configured
+        if settings.gcp_project_id:
+            try:
+                from google.cloud import aiplatform
+                aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
+                # This is a bit complex for a simple list, usually we know the ones we support
+                # but let's provide a good default list for Vertex
+                return {
+                    "mode": "gemini", 
+                    "models": [
+                        "gemini-live-2.5-flash-native-audio",
+                        "gemini-2.5-flash", 
+                        "gemini-1.5-flash", 
+                        "gemini-1.5-pro",
+                        "gemini-2.0-flash-exp"
+                    ]
+                }
+            except Exception as e:
+                logger.warning("Failed to setup Vertex AI model list: %s", e)
+                return {"mode": "gemini", "models": ["gemini-live-2.5-flash-native-audio", "gemini-2.5-flash", "gemini-1.5-flash"]}
+
+        # 2. Use AI Studio with API Key
         try:
             import google.generativeai as genai
-            genai.configure(api_key=settings.gemini_api_key)
+            # Ensure we use REST transport to avoid auth collision even here
+            genai.configure(api_key=settings.gemini_api_key, transport="rest")
             models = []
             for m in genai.list_models():
                 if "generateContent" in m.supported_generation_methods:
                     models.append(m.name.replace("models/", ""))
-            models.sort(reverse=True) # Usually newer models are alphabetically/numerically higher
+            models.sort(reverse=True)
             if not models:
-                models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
+                models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
             return {"mode": "gemini", "models": models}
         except Exception as e:
             logger.warning("Failed to fetch dynamic Gemini models: %s", e)
-            return {"mode": "gemini", "models": ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"]}
+            return {"mode": "gemini", "models": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]}
 
     elif mode == "openai":
         try:

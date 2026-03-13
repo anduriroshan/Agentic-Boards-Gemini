@@ -196,12 +196,12 @@ async def guardrail_node(state: AgentState) -> dict:
     # Use a fast model for guardrails (defaulting to gemini-2.0-flash if possible)
     llm = get_llm(state.get("llm_model"))
     
-    last_message = state["messages"][-1].content
+    messages = state.get("messages", [])
     
+    # Pass the whole conversation to the guardrail for context (e.g. "try again")
     prompt = [
         SystemMessage(content=GUARDRAIL_SYSTEM_PROMPT),
-        HumanMessage(content=f"User Message: {last_message}")
-    ]
+    ] + list(messages)
     
     try:
         response = await llm.ainvoke(prompt)

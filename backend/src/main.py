@@ -11,6 +11,7 @@ from src.api.routes_chat import router as chat_router
 from src.api.routes_databricks import router as databricks_router
 from src.api.routes_charts import router as charts_router
 from src.api.routes_live import router as live_router
+from src.api.routes_bigquery import router as bigquery_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,6 +58,7 @@ app.include_router(databricks_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
 app.include_router(workspace_router, prefix="/api")
 app.include_router(live_router, prefix="/api")
+app.include_router(bigquery_router, prefix="/api")
 
 # Serve frontend static files (SPA compatible)
 frontend_path = os.path.join(os.getcwd(), "frontend_dist")

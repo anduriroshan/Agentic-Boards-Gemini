@@ -99,22 +99,29 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
     # Issue Session Token
     token = create_session_for_user(db, user)
 
-    # We want to redirect back to the Frontend (port 5173) and give it the token
-    # A simple way is to pass it in a cookie and redirect to the frontend base url
-    frontend_url = "https://agentic-boards.live"
+    # We want to redirect back to the Frontend and give it the token
+    frontend_url = settings.frontend_url or "http://localhost:8001"
     response = RedirectResponse(url=frontend_url)
     
-    # Set HTTP-only cookie or just a standard accessible cookie for the UI
-    response.set_cookie(
-        key="session_token",
-        value=token,
-        httponly=False,
-        max_age=7 * 24 * 3600,
-        domain=".agentic-boards.live",
-        path="/",
-        secure=True,
-        samesite="lax",
-    )
+    # Determine if we are running on localhost for cookie flags
+    is_localhost = "localhost" in frontend_url or "127.0.0.1" in frontend_url
+    
+    # Set session token cookie
+    cookie_kwargs = {
+        "key": "session_token",
+        "value": token,
+        "httponly": False,
+        "max_age": 7 * 24 * 3600,
+        "path": "/",
+        "samesite": "lax",
+        "secure": not is_localhost, # Disable secure flag on localhost (http)
+    }
+    
+    # Only set domain if not on localhost
+    if not is_localhost and ".live" in frontend_url:
+        cookie_kwargs["domain"] = ".agentic-boards.live"
+        
+    response.set_cookie(**cookie_kwargs)
     return response
 
 @router.get("/auth/me")

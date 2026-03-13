@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     google_client_id: str = Field(default="")
     google_client_secret: str = Field(default="")
     google_redirect_uri: str = Field(default="")
+    frontend_url: str = Field(default="http://localhost:8001")
     
     # ── LLM ───────────────────────────────────────────────────
     # Mode: "openai" or "gemini"

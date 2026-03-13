@@ -16,17 +16,28 @@ def _get_embeddings():
     global _embeddings
     if _embeddings is None:
         try:
-            from langchain_google_genai import GoogleGenerativeAIEmbeddings
-            
-            logger.info("Initializing Google Gemini Embeddings...")
-            _embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/text-embedding-004",
-                google_api_key=settings.gemini_api_key
-            )
-        except ImportError:
+            # 1. Use Vertex AI if GCP context is provided
+            if settings.gcp_project_id:
+                from langchain_google_vertexai import VertexAIEmbeddings
+                logger.info("Initializing Vertex AI Embeddings...")
+                _embeddings = VertexAIEmbeddings(
+                    model="text-embedding-004",
+                    project=settings.gcp_project_id,
+                    location=settings.gcp_region,
+                )
+            else:
+                # 2. Fallback to AI Studio
+                from langchain_google_genai import GoogleGenerativeAIEmbeddings
+                logger.info("Initializing Google Gemini Embeddings (AI Studio)...")
+                _embeddings = GoogleGenerativeAIEmbeddings(
+                    model="models/text-embedding-004",
+                    google_api_key=settings.gemini_api_key,
+                    transport="rest",
+                )
+        except ImportError as e:
             raise RuntimeError(
-                "langchain-google-genai is required. "
-                "Install it with: pip install langchain-google-genai"
+                f"Required library missing: {e}. "
+                "Check pyproject.toml dependencies."
             )
     return _embeddings
 

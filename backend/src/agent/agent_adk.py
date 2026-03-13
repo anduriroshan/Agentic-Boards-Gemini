@@ -8,9 +8,11 @@ Multimodal Live API.
 
 import json
 import logging
+import os
 from typing import Annotated
 
-from google import adk
+from google import adk, genai
+from google.adk.models import Gemini
 from pydantic import BaseModel, Field
 
 from src.agent.tools import (
@@ -32,35 +34,35 @@ logger = logging.getLogger(__name__)
 
 # ── ADK Tool Definitions ───────────────────────────────────────────────────
 
-@adk.tool
+
 def search_metadata(
     query: Annotated[str, "Natural language description of the data the user wants, e.g. 'sales by region'"]
 ) -> str:
     """Search the Databricks metadata catalogue to find relevant tables and columns."""
     return legacy_search_metadata.invoke({"query": query})
 
-@adk.tool
+
 def execute_sql(
     sql: Annotated[str, "A valid Databricks SQL query using fully-qualified table names."]
 ) -> str:
     """Execute a SQL query on the Databricks warehouse and return the result rows."""
     return legacy_execute_sql.invoke({"sql": sql})
 
-@adk.tool
+
 def execute_bigquery(
     sql: Annotated[str, "A valid BigQuery SQL query (standard SQL)."]
 ) -> str:
     """Execute a SQL query on Google BigQuery and return the result rows."""
     return legacy_execute_bigquery.invoke({"sql": sql})
 
-@adk.tool
+
 def create_visualization(
     vega_lite_spec: Annotated[str, "A COMPLETE Vega-Lite v5 JSON specification as a string."]
 ) -> str:
     """Add a new chart tile to the user's dashboard."""
     return legacy_create_visualization.invoke({"vega_lite_spec": vega_lite_spec})
 
-@adk.tool
+
 def create_kpi_tile(
     title: str, 
     value: str, 
@@ -77,7 +79,7 @@ def create_kpi_tile(
         "sparkline_data": sparkline_data
     })
 
-@adk.tool
+
 def create_data_table(
     title: str, 
     columns: str, 
@@ -90,7 +92,7 @@ def create_data_table(
         "rows": rows
     })
 
-@adk.tool
+
 def update_data_table(
     tile_id: str, 
     title: str, 
@@ -105,7 +107,7 @@ def update_data_table(
         "rows": rows
     })
 
-@adk.tool
+
 def create_text_tile(
     title: str, 
     markdown: str
@@ -116,14 +118,14 @@ def create_text_tile(
         "markdown": markdown
     })
 
-@adk.tool
+
 def modify_dashboard(
     modifications: str
 ) -> str:
     """Modify existing dashboard tiles — change chart specs, rename headers, or reposition tiles."""
     return legacy_modify_dashboard.invoke({"modifications": modifications})
 
-@adk.tool
+
 def remove_tiles(
     tile_ids: list[str]
 ) -> str:
@@ -137,11 +139,43 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty."):
     
     instructions = REACT_SYSTEM_PROMPT.format(dashboard_context=dashboard_context)
     
+    # ── Debug Logs ──
+    logger.info(f"ADK Agent Initialization: settings.gemini_model={settings.gemini_model}")
+    logger.info(f"ADK Agent Initialization: os.environ.get('GEMINI_MODEL')={os.environ.get('GEMINI_MODEL')}")
+    
+    # ── Force Global Environment for Vertex AI ──
+    # This ensures any internal Client() creation (including by ADK) uses Vertex AI.
+    os.environ["GOOGLE_CLOUD_PROJECT"] = settings.gcp_project_id
+    os.environ["GOOGLE_CLOUD_LOCATION"] = settings.gcp_region
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath("service_account.json")
+    
+    # Remove API keys to prevent fallback to Gemini API (AI Studio)
+    os.environ.pop("GEMINI_API_KEY", None)
+    os.environ.pop("GOOGLE_API_KEY", None)
+    
+    # ── Force Vertex AI Authentication ──
+    # The Multimodal Live API (ADK run_live) on Vertex AI requires OAuth 2.
+    # By default, ADK might try Gemini API (AI Studio) if an API key is present.
+    # We initialize an explicit genai.Client with vertexai=True to ensure OAuth/service account auth.
+    api_client = genai.Client(
+        vertexai=True,
+        project=settings.gcp_project_id,
+        location=settings.gcp_region
+    )
+    
+    model = Gemini(
+        model=settings.gemini_model
+    )
+    # Set the private attributes explicitly to ensure ADK uses the configured Vertex client
+    # for both regular and live connections.
+    model._api_client = api_client
+    model._live_api_client = api_client
+    
     agent = adk.Agent(
         name="AgenticBoardsLive",
-        model=settings.gemini_model, # e.g. gemini-2.0-flash-exp
+        model=model,
         description="A real-time voice-interactive BI consultant.",
-        instructions=instructions,
+        instruction=instructions,
         tools=[
             search_metadata,
             execute_sql,

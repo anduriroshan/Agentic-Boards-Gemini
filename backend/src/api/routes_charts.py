@@ -111,22 +111,23 @@ async def refresh_chart(request: ChartRefreshRequest):
     (e.g. LIMIT, sort order) without re-invoking the AI agent.
     """
     from src.databricks.client import get_databricks_manager
+    from src.bigquery.client import get_bigquery_manager
 
-    dm = get_databricks_manager()
-
-    if not dm.is_connected:
-        return {"error": "Databricks is not connected.", "rows": []}
-
-    try:
-        validate_sql_read_only(request.sql)
-    except InvalidSQLError as e:
-        return {"error": str(e), "rows": []}
+    provider_type = request.params.get("type", "databricks").lower()
 
     try:
         modified_sql = apply_sql_params(request.sql, request.params)
-        logger.info("[CHART REFRESH] SQL: %s", modified_sql[:200])
+        logger.info("[CHART REFRESH] provider=%s SQL: %s", provider_type, modified_sql[:200])
 
-        rows = dm.query(modified_sql)
+        if provider_type == "bigquery":
+            bq = get_bigquery_manager()
+            rows = bq.query(modified_sql)
+        else:
+            dm = get_databricks_manager()
+            if not dm.is_connected:
+                return {"error": "Databricks is not connected.", "rows": []}
+            validate_sql_read_only(request.sql)
+            rows = dm.query(modified_sql)
 
         # Serialize non-JSON-safe types
         for row in rows:

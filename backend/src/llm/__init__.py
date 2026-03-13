@@ -72,22 +72,45 @@ def _build_openai(requested_model: str | None = None) -> BaseChatModel:
 
 
 def _build_gemini(requested_model: str | None = None) -> BaseChatModel:
-    """Google Gemini API via langchain-google-genai.
+    """Google Gemini API — switches between AI Studio and Vertex AI.
 
-    Set GEMINI_API_KEY and optionally GEMINI_MODEL in your .env file.
+    If GCP_PROJECT_ID is set in .env, this uses Vertex AI (LangChain's ChatVertexAI).
+    Otherwise, it uses the direct Gemini API (ChatGoogleGenerativeAI) with an API Key.
     """
+    model_name = requested_model or settings.gemini_model
+    # 1. Use Vertex AI if GCP context is provided (Recommended for GCP users)
+    if settings.gcp_project_id:
+        from langchain_google_vertexai import ChatVertexAI
+        
+        # Determine location: newer preview models often require 'global'
+        location = settings.gcp_region
+        if "3.1" in model_name or "preview" in model_name:
+            location = "global"
+
+        logger.info(
+            "LLM mode=gemini (VertexAI)  model=%s  project=%s  location=%s",
+            model_name,
+            settings.gcp_project_id,
+            location
+        )
+        return ChatVertexAI(
+            model=model_name,
+            project=settings.gcp_project_id,
+            location=location,
+            temperature=0.7,
+        )
+
+    # 2. Fallback to direct Gemini API with API Key (Generative AI Studio)
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     if not settings.gemini_api_key:
         raise RuntimeError(
-            "GEMINI_API_KEY is not set. "
-            "Set it in backend/.env for gemini mode."
+            "Neither GCP_PROJECT_ID nor GEMINI_API_KEY is set. "
+            "Set one in backend/.env for gemini mode."
         )
 
-    model_name = requested_model or settings.gemini_model
-
     logger.info(
-        "LLM mode=gemini  model=%s",
+        "LLM mode=gemini (AI-Studio)  model=%s",
         model_name,
     )
 
@@ -95,4 +118,6 @@ def _build_gemini(requested_model: str | None = None) -> BaseChatModel:
         google_api_key=settings.gemini_api_key,
         model=model_name,
         temperature=0.7,
+        # Explicitly use REST for better API Key compatibility 
+        transport="rest",
     )

@@ -128,62 +128,70 @@ class SearchMetadataInput(BaseModel):
 
 @tool("search_metadata", args_schema=SearchMetadataInput)
 def search_metadata(query: str) -> str:
-    """Search the Databricks metadata catalogue to find relevant tables,
-    columns, measures, and dimensions for a user's data request.
+    """Search for relevant data sources (BigQuery or Databricks).
 
-    Uses a lazy in-memory schema cache — no upfront indexing required.
-    Falls back to Milvus vector search when available for richer results.
-
-    Always call this FIRST before writing SQL.
+    Always call this FIRST before writing SQL to find the correct table names,
+    columns, and connection type (BigQuery vs Databricks).
     """
     from src.config import settings
     from src.databricks.client import get_databricks_manager
+    from src.bigquery.client import get_bigquery_manager
     from src.metadata import schema_cache
 
-    mgr = get_databricks_manager()
-    catalog = mgr.catalog
-    schema_name = mgr.schema
+    results = []
 
-    # ── 1. Try Milvus first (if enabled and populated) ────────────────────
+    # 1. Try Milvus Vector Search (Cross-provider)
     if settings.milvus_enabled:
         try:
             from src.metadata.databricks_store import DatabricksMetadataStore
             store = DatabricksMetadataStore()
             hits = store.search(query, top_k=15)
-            logger.info("[TOOL:search_metadata] Milvus returned %d hits for: %s", len(hits), query[:80])
-
-            # Only use Milvus results if they look relevant (score threshold)
             good_hits = [h for h in hits if h.get("score", 0) >= 0.35]
             if good_hits:
-                return json.dumps(_hits_to_metadata(good_hits), indent=2)
-
-            logger.info("[TOOL:search_metadata] Milvus hits below threshold — falling back to schema cache")
+                logger.info("[TOOL:search_metadata] Milvus found %d relevant items", len(good_hits))
+                results.extend(_hits_to_metadata(good_hits))
         except Exception as e:
-            logger.warning("[TOOL:search_metadata] Milvus unavailable: %s", e)
+            logger.warning("[TOOL:search_metadata] Milvus lookup skipped: %s", e)
 
-    # ── 2. Lazy schema cache (SHOW TABLES + DESCRIBE on first call) ───────
-    if not mgr.is_connected:
-        logger.warning("[TOOL:search_metadata] Databricks not connected — using static fallback")
-        return json.dumps(_get_fallback_metadata(), indent=2)
+    # 2. Check BigQuery Default Table
+    bq = get_bigquery_manager()
+    if bq.default_table and query.lower() in bq.default_table.lower():
+        results.append({
+            "cube": bq.default_table.split(".")[-1],
+            "table": bq.default_table,
+            "type": "bigquery",
+            "description": "Primary BigQuery table for this project."
+        })
 
-    try:
-        results = schema_cache.search(
-            query=query,
-            catalog=catalog,
-            schema=schema_name,
-            top_k=5,
-        )
-        if results:
-            logger.info(
-                "[TOOL:search_metadata] Schema cache returned %d table(s): %s",
-                len(results),
-                [r["table"].split(".")[-1] for r in results],
+    # 3. Check Databricks Cache (if connected)
+    dm = get_databricks_manager()
+    if dm.is_connected:
+        try:
+            cache_hits = schema_cache.search(
+                query=query,
+                catalog=dm.catalog,
+                schema=dm.schema,
+                top_k=5,
             )
-            return json.dumps(results, indent=2)
-    except Exception as e:
-        logger.warning("[TOOL:search_metadata] Schema cache failed: %s", e)
+            if cache_hits:
+                results.extend(cache_hits)
+        except Exception as e:
+            logger.warning("[TOOL:search_metadata] Databricks cache lookup failed: %s", e)
+    
+    # 4. Filter and return
+    if results:
+        # De-duplicate by table name
+        seen = set()
+        unique_results = []
+        for r in results:
+            t = r.get("table")
+            if t and t not in seen:
+                unique_results.append(r)
+                seen.add(t)
+        return json.dumps(unique_results, indent=2)
 
-    # ── 3. Last resort: return the configured default table ───────────────
+    # 5. Last resort: Static fallback
+    logger.info("[TOOL:search_metadata] No dynamic hits — using static fallback")
     return json.dumps(_get_fallback_metadata(), indent=2)
 
 

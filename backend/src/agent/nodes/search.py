@@ -25,8 +25,8 @@ FALLBACK_METADATA = [
         "description": "COA hierarchy (fallback – run index_databricks_metadata to populate Milvus)",
     },
     {
-        "cube": "sales",
-        "table": "agentic-boards.iowa_liquor_retail_sales.sales",
+        "cube": settings.bigquery_default_table.split(".")[-1] if settings.bigquery_default_table else "sales",
+        "table": settings.bigquery_default_table or "agentic-boards.iowa_liquor_retail_sales.sales",
         "type": "bigquery",
         "measures": [],
         "dimensions": [],
