@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, Volume2, VolumeX, Activity } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { useDashboardStore } from "@/stores/dashboardStore";
 
 const LiveAgent: React.FC = () => {
@@ -10,7 +10,7 @@ const LiveAgent: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   
-  const { addTile, addTableTile, addKpiTile, addTextTile, updateTile, updateTableTile, updateTileLayouts, removeTile } = useDashboardStore();
+  const { addTile, addTableTile, addKpiTile, addTextTile, updateTileLayouts, removeTile } = useDashboardStore();
 
   const toggleLive = () => {
     if (isActive) {
@@ -82,7 +82,7 @@ const LiveAgent: React.FC = () => {
         addTableTile(args.tile_id || crypto.randomUUID(), { columns: JSON.parse(args.columns), rows: JSON.parse(args.rows) }, args.title);
         break;
       case "create_kpi_tile":
-        addKpiTile(args.tile_id || crypto.randomUUID(), { value: args.value, subtitle: args.subtitle, color: args.color, sparkline_data: args.sparkline_data ? JSON.parse(args.sparkline_data) : undefined }, args.title);
+        addKpiTile(args.tile_id || crypto.randomUUID(), { value: args.value, subtitle: args.subtitle, color: args.color, sparkline: args.sparkline_data ? JSON.parse(args.sparkline_data) : undefined }, args.title);
         break;
       case "create_text_tile":
         addTextTile(args.tile_id || crypto.randomUUID(), args.markdown, args.title);

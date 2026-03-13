@@ -11,7 +11,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Final stage for backend and serving frontend
-FROM python:3.11-slim
+FROM python:3.12-slim
 WORKDIR /app
 
 # Copy uv binary

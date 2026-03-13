@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   Panel,
   PanelGroup,
@@ -8,8 +9,8 @@ import {
 import ChatPanel from "@/components/chat/ChatPanel";
 import DashboardCanvas from "@/components/dashboard/DashboardCanvas";
 import AgentActivity from "@/components/activity/AgentActivity";
-import DatabricksSettings from "@/components/databricks/DatabricksSettings";
 import SessionsPanel from "@/components/sessions/SessionsPanel";
+import DataSourceSelector from "@/components/layout/DataSourceSelector";
 import LiveAgent from "@/components/chat/LiveAgent";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +20,7 @@ export default function AppShell() {
   const chatRef = useRef<ImperativePanelHandle>(null);
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showDataSource, setShowDataSource] = useState(false);
 
   const [activityCollapsed, setActivityCollapsed] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
@@ -45,7 +47,30 @@ export default function AppShell() {
         <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Agentic Boards</h1>
         <div className="flex items-center gap-4">
           <SessionsPanel />
-          <DatabricksSettings />
+          
+          <div className="relative">
+            <button
+              onClick={() => setShowDataSource(!showDataSource)}
+              className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium border hover:bg-muted transition-colors shadow-sm bg-background"
+            >
+              <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+              </svg>
+              Data Source
+              <svg className={cn("w-3 h-3 transition-transform", showDataSource && "rotate-180")} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showDataSource && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowDataSource(false)}></div>
+                <div className="absolute right-0 top-full mt-2 z-50 w-[400px] rounded-lg border bg-card shadow-xl animate-in fade-in slide-in-from-top-2">
+                  <DataSourceSelector />
+                </div>
+              </>
+            )}
+          </div>
 
           {user && (
             <div className="relative border-l pl-4 border-slate-200 dark:border-slate-800 ml-2 h-8 flex items-center">

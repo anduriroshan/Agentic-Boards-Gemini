@@ -31,6 +31,7 @@ export interface QueryParam {
 export interface QueryMeta {
   sql: string;
   params: Record<string, QueryParam>;
+  type?: "bigquery" | "databricks";
 }
 
 export interface Comment {

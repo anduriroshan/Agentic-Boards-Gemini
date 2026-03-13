@@ -58,7 +58,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
       try {
         const result = await refreshChartData(
           tile.queryMeta.sql,
-          paramOverrides || {},
+          { ...(paramOverrides || {}), type: tile.queryMeta.type },
         );
         if (!result.error && result.rows && result.rows.length > 0) {
           if (tile.type === "chart" && tile.vegaSpec) {
@@ -78,6 +78,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
             updateTileQueryMeta(tile.id, {
               sql: result.sql || tile.queryMeta.sql,
               params: result.params as Record<string, import("@/types/dashboard").QueryParam>,
+              type: tile.queryMeta.type,
             });
           }
         }

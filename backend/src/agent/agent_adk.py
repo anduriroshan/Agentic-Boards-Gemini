@@ -143,19 +143,8 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty."):
     logger.info(f"ADK Agent Initialization: settings.gemini_model={settings.gemini_model}")
     logger.info(f"ADK Agent Initialization: os.environ.get('GEMINI_MODEL')={os.environ.get('GEMINI_MODEL')}")
     
-    # ── Force Global Environment for Vertex AI ──
-    # This ensures any internal Client() creation (including by ADK) uses Vertex AI.
-    os.environ["GOOGLE_CLOUD_PROJECT"] = settings.gcp_project_id
-    os.environ["GOOGLE_CLOUD_LOCATION"] = settings.gcp_region
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath("service_account.json")
-    
-    # Remove API keys to prevent fallback to Gemini API (AI Studio)
-    os.environ.pop("GEMINI_API_KEY", None)
-    os.environ.pop("GOOGLE_API_KEY", None)
-    
     # ── Force Vertex AI Authentication ──
     # The Multimodal Live API (ADK run_live) on Vertex AI requires OAuth 2.
-    # By default, ADK might try Gemini API (AI Studio) if an API key is present.
     # We initialize an explicit genai.Client with vertexai=True to ensure OAuth/service account auth.
     api_client = genai.Client(
         vertexai=True,
@@ -167,10 +156,10 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty."):
         model=settings.gemini_model
     )
     # Inject the Vertex AI client directly into the cached_property cache.
-    # ADK's Gemini model exposes `api_client` as a functools.cached_property
-    # whose cached value lives in instance.__dict__['api_client'] (no underscore).
-    # Setting model._api_client does nothing; we must populate the cache key directly.
+    # ADK's Gemini model exposes `api_client` and `_live_api_client` as cached_properties.
+    # We must populate both in the instance __dict__ to ensure the correct Vertex client is used.
     model.__dict__['api_client'] = api_client
+    model.__dict__['_live_api_client'] = api_client
     
     agent = adk.Agent(
         name="AgenticBoardsLive",

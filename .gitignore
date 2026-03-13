@@ -249,7 +249,8 @@ Thumbs.db
 
 # Cube.js
 cube/.cache/
-
+backend/service_account.json
+service_account.json
 # Misc
 *.log
 tmpclaude-*

@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -82,3 +83,19 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# ── Global Vertex AI Environment Setup ──
+# Set these globally to ensure all SDKs (genai, aiplatform, bigquery) 
+# use the same Vertex AI context and credentials.
+if settings.gcp_project_id:
+    os.environ["GOOGLE_CLOUD_PROJECT"] = settings.gcp_project_id
+    os.environ["GOOGLE_CLOUD_LOCATION"] = settings.gcp_region
+    # Force the service account path if it exists
+    sa_path = os.path.join(os.getcwd(), "service_account.json")
+    if os.path.exists(sa_path):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = sa_path
+
+# Remove API keys to prevent SDKs from falling back to Gemini API (AI Studio)
+# which causes authentication conflicts with Vertex AI.
+os.environ.pop("GEMINI_API_KEY", None)
+os.environ.pop("GOOGLE_API_KEY", None)
