@@ -166,10 +166,11 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty."):
     model = Gemini(
         model=settings.gemini_model
     )
-    # Set the private attributes explicitly to ensure ADK uses the configured Vertex client
-    # for both regular and live connections.
-    model._api_client = api_client
-    model._live_api_client = api_client
+    # Inject the Vertex AI client directly into the cached_property cache.
+    # ADK's Gemini model exposes `api_client` as a functools.cached_property
+    # whose cached value lives in instance.__dict__['api_client'] (no underscore).
+    # Setting model._api_client does nothing; we must populate the cache key directly.
+    model.__dict__['api_client'] = api_client
     
     agent = adk.Agent(
         name="AgenticBoardsLive",
