@@ -13,7 +13,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
@@ -117,6 +117,12 @@ def _parse_llm_json(s: str) -> dict | list:
             return obj
         except json.JSONDecodeError:
             raise e
+
+
+def _stable_tile_id(prefix: str, payload: object) -> str:
+    """Create deterministic tile IDs for idempotent retries in live mode."""
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{prefix}:{canonical}"))
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Tool 1 – Search Metadata
@@ -459,9 +465,9 @@ def create_visualization(vega_lite_spec: str) -> str:
 
 class ModifyDashboardInput(BaseModel):
     """Input for the modify_dashboard tool."""
-    modifications: str = Field(
+    modifications: str | dict[str, Any] | list[dict[str, Any]] = Field(
         description=(
-            'A JSON string with any combination of these optional keys: '
+            'A JSON object (or JSON string of that object) with any combination of these optional keys: '
             '"spec_updates" (array of {tile_id, vega_spec}) to change chart appearance; '
             '"layout_updates" (array of {tile_id, x, y, w, h}) to reposition/resize on the 12-column grid; '
             '"title_updates" (array of {tile_id, title}) to rename the tile header label; '
@@ -473,7 +479,7 @@ class ModifyDashboardInput(BaseModel):
 
 
 @tool("modify_dashboard", args_schema=ModifyDashboardInput)
-def modify_dashboard(modifications: str) -> str:
+def modify_dashboard(modifications: str | dict[str, Any] | list[Any]) -> str:
     """Modify existing dashboard tiles — change chart specs (colours, marks,
     axis labels), rename tile header labels, and/or reposition / resize tiles
     on the 12-column grid.
@@ -488,10 +494,118 @@ def modify_dashboard(modifications: str) -> str:
     - w: width in columns (1-12, 12=full width, 6=half)
     - h: height in row units (each row ≈ 100px, typical chart h=3-5)
     """
-    try:
-        mods = _parse_llm_json(modifications)
-    except json.JSONDecodeError as e:
-        return json.dumps({"error": f"Invalid JSON: {e}"})
+    if isinstance(modifications, str):
+        try:
+            mods = _parse_llm_json(modifications)
+        except json.JSONDecodeError as e:
+            return json.dumps({"error": f"Invalid JSON: {e}"})
+    elif isinstance(modifications, (dict, list)):
+        mods = modifications
+    else:
+        return json.dumps({"error": "Invalid modifications payload type."})
+
+    # The live model may occasionally return a top-level JSON array instead of the
+    # expected object. Normalize common list shapes so we can recover instead of
+    # throwing and killing the live session.
+    if isinstance(mods, list):
+        if not mods:
+            mods = {}
+        else:
+            normalized_items: list[dict] = []
+            for item in mods:
+                if isinstance(item, str):
+                    try:
+                        parsed = _parse_llm_json(item)
+                        if isinstance(parsed, dict):
+                            normalized_items.append(parsed)
+                    except json.JSONDecodeError:
+                        logger.warning("[TOOL:modify_dashboard] ignored non-JSON list item: %r", item[:120])
+                elif isinstance(item, dict):
+                    normalized_items.append(item)
+
+            if not normalized_items:
+                mods = {}
+            else:
+                bucketed: dict[str, list[dict]] = {
+                    "spec_updates": [],
+                    "layout_updates": [],
+                    "title_updates": [],
+                    "kpi_updates": [],
+                    "text_updates": [],
+                }
+                for item in normalized_items:
+                    tile_id = item.get("tile_id")
+
+                    if "spec_updates" in item:
+                        spec_val = item.get("spec_updates")
+                        if isinstance(spec_val, list):
+                            bucketed["spec_updates"].extend([u for u in spec_val if isinstance(u, dict)])
+                        elif isinstance(spec_val, dict):
+                            spec_upd = dict(spec_val)
+                            if tile_id and "tile_id" not in spec_upd:
+                                spec_upd["tile_id"] = tile_id
+                            bucketed["spec_updates"].append(spec_upd)
+                        continue
+
+                    if "layout_updates" in item:
+                        layout_val = item.get("layout_updates")
+                        if isinstance(layout_val, list):
+                            bucketed["layout_updates"].extend([u for u in layout_val if isinstance(u, dict)])
+                        elif isinstance(layout_val, dict):
+                            layout_upd = dict(layout_val)
+                            if tile_id and "tile_id" not in layout_upd:
+                                layout_upd["tile_id"] = tile_id
+                            bucketed["layout_updates"].append(layout_upd)
+                        continue
+
+                    if "title_updates" in item:
+                        title_val = item.get("title_updates")
+                        if isinstance(title_val, list):
+                            bucketed["title_updates"].extend([u for u in title_val if isinstance(u, dict)])
+                        elif isinstance(title_val, dict):
+                            title_upd = dict(title_val)
+                            if tile_id and "tile_id" not in title_upd:
+                                title_upd["tile_id"] = tile_id
+                            bucketed["title_updates"].append(title_upd)
+                        continue
+
+                    if "kpi_updates" in item:
+                        kpi_val = item.get("kpi_updates")
+                        if isinstance(kpi_val, list):
+                            bucketed["kpi_updates"].extend([u for u in kpi_val if isinstance(u, dict)])
+                        elif isinstance(kpi_val, dict):
+                            kpi_upd = dict(kpi_val)
+                            if tile_id and "tile_id" not in kpi_upd:
+                                kpi_upd["tile_id"] = tile_id
+                            bucketed["kpi_updates"].append(kpi_upd)
+                        continue
+
+                    if "text_updates" in item:
+                        text_val = item.get("text_updates")
+                        if isinstance(text_val, list):
+                            bucketed["text_updates"].extend([u for u in text_val if isinstance(u, dict)])
+                        elif isinstance(text_val, dict):
+                            text_upd = dict(text_val)
+                            if tile_id and "tile_id" not in text_upd:
+                                text_upd["tile_id"] = tile_id
+                            bucketed["text_updates"].append(text_upd)
+                        continue
+
+                    if "vega_spec" in item:
+                        bucketed["spec_updates"].append(item)
+                    elif all(k in item for k in ("x", "y", "w", "h")):
+                        bucketed["layout_updates"].append(item)
+                    elif "markdown" in item:
+                        bucketed["text_updates"].append(item)
+                    elif any(k in item for k in ("value", "subtitle", "color")):
+                        bucketed["kpi_updates"].append(item)
+                    elif "title" in item:
+                        bucketed["title_updates"].append(item)
+
+                mods = {k: v for k, v in bucketed.items() if v}
+
+    if not isinstance(mods, dict):
+        return json.dumps({"error": "Invalid modifications payload. Expected an object or list of update objects."})
 
     result: dict = {"action": "modify_dashboard"}
 
@@ -734,9 +848,13 @@ class CreateKpiTileInput(BaseModel):
         default="",
         description="Optional JSON array of numeric values to render a sparkline trend chart beneath the KPI (e.g. '[10, 20, 15, 30]')."
     )
+    tile_id: str = Field(
+        default="",
+        description="Optional explicit tile_id. If omitted, a deterministic ID is derived from KPI content for idempotent retries."
+    )
 
 @tool("create_kpi_tile", args_schema=CreateKpiTileInput)
-def create_kpi_tile(title: str, value: str, subtitle: str = "", color: str = "", sparkline_data: str = "") -> str:
+def create_kpi_tile(title: str, value: str, subtitle: str = "", color: str = "", sparkline_data: str = "", tile_id: str = "") -> str:
     """Add a Power BI-style KPI / metric card tile to the dashboard.
 
     Use this when the user wants a simple number / metric displayed
@@ -750,7 +868,17 @@ def create_kpi_tile(title: str, value: str, subtitle: str = "", color: str = "",
 
     Examples: total revenue, average order value, record count, % change.
     """
-    tile_id = str(uuid.uuid4())
+    if not tile_id:
+        tile_id = _stable_tile_id(
+            "kpi",
+            {
+                "title": title.strip(),
+                "value": value.strip(),
+                "subtitle": subtitle.strip(),
+                "color": color.strip(),
+                "sparkline_data": sparkline_data.strip(),
+            },
+        )
 
     logger.info(
         "[TOOL:create_kpi_tile] tile=%s  title=%r  value=%r",

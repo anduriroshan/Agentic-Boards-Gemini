@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Annotated
+from typing import Annotated, Any
 
 from google import adk, genai
 from google.genai import types
@@ -36,6 +36,21 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 # ── Activity Status Helper ───────────────────────────────────────────────────
+
+_ACTIVITY_TOOL_AGENT: dict[str, tuple[str, str]] = {
+    "search_metadata": ("DataAgent", "search"),
+    "execute_sql": ("DataAgent", "database"),
+    "execute_bigquery": ("DataAgent", "database"),
+    "get_bigquery_schema": ("DataAgent", "database"),
+    "create_visualization": ("VizAgent", "bar-chart-3"),
+    "create_kpi_tile": ("VizAgent", "chart-bar"),
+    "create_text_tile": ("VizAgent", "file-text"),
+    "create_data_table": ("VizAgent", "table"),
+    "update_data_table": ("VizAgent", "table"),
+    "modify_dashboard": ("DashboardAgent", "layout"),
+    "remove_tiles": ("DashboardAgent", "layout"),
+    "get_recent_activity": ("Orchestrator", "history"),
+}
 
 def summarize_tool_output(result_text: str, max_rows: int = 15) -> str:
     """
@@ -71,12 +86,19 @@ def summarize_tool_output(result_text: str, max_rows: int = 15) -> str:
 
 async def send_activity_status(tool_name: str, summary: str, status: str = "running"):
     """Helper to send a real-time status update to the frontend via WebSocket."""
-    from src.api.routes_live import _current_websocket, _current_step_id, _TOOL_AGENT
-    import uuid
+    from src.api import routes_live
     import time
     
-    ws = _current_websocket.get()
-    step_id = _current_step_id.get()
+    current_websocket = getattr(routes_live, "_current_websocket", None)
+    current_step_id = getattr(routes_live, "_current_step_id", None)
+    tool_agent_map = getattr(routes_live, "_TOOL_AGENT", _ACTIVITY_TOOL_AGENT)
+
+    if current_websocket is None or current_step_id is None:
+        logger.debug("[WS] Live route context vars unavailable; skipping activity status for %s", tool_name)
+        return
+
+    ws = current_websocket.get()
+    step_id = current_step_id.get()
     
     if not ws:
         logger.debug(f"[WS] No active websocket in ContextVar for tool {tool_name}. Activity status update skipped.")
@@ -86,7 +108,7 @@ async def send_activity_status(tool_name: str, summary: str, status: str = "runn
         step_id = f"tool_{tool_name}_{int(time.time())}"
         logger.debug(f"[WS] No step_id in ContextVar, generated fallback: {step_id}")
     
-    agent_name, icon = _TOOL_AGENT.get(tool_name, ("DataAgent", "database"))
+    agent_name, icon = tool_agent_map.get(tool_name, ("DataAgent", "database"))
     
     try:
         await ws.send_json({
@@ -223,13 +245,31 @@ async def create_text_tile(
 
 
 async def modify_dashboard(
-    modifications: str
+    modifications: str | dict[str, Any] | list[Any]
 ) -> str:
     """Modify existing dashboard tiles — change chart specs, rename headers, or reposition tiles."""
     await send_activity_status("modify_dashboard", "Applying surgical updates...")
-    res = await asyncio.to_thread(legacy_modify_dashboard.invoke, {"modifications": modifications})
-    await send_activity_status("modify_dashboard", "Dashboard Modified", status="done")
-    return res
+    try:
+        payload = modifications if isinstance(modifications, str) else json.dumps(modifications)
+        res = await asyncio.to_thread(legacy_modify_dashboard.invoke, {"modifications": payload})
+        status_msg = "Dashboard Modified"
+        try:
+            parsed = json.loads(res)
+            if isinstance(parsed, dict) and parsed.get("error"):
+                status_msg = f"Dashboard update failed: {str(parsed['error'])[:120]}"
+                logger.warning("modify_dashboard returned tool error: %s", parsed["error"])
+        except Exception:
+            pass
+
+        await send_activity_status("modify_dashboard", status_msg, status="done")
+        return res
+    except Exception as e:
+        logger.exception("modify_dashboard tool failed: %s", e)
+        await send_activity_status("modify_dashboard", "Dashboard update failed", status="done")
+        return json.dumps({
+            "action": "modify_dashboard",
+            "error": f"modify_dashboard failed: {e}",
+        })
 
 
 async def remove_tiles(
@@ -313,7 +353,7 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty.", 
             get_recent_activity,
         ],
         generate_content_config=types.GenerateContentConfig(
-            response_modalities=["AUDIO"]
+            response_modalities=[types.Modality.AUDIO]
         )
     )
     
