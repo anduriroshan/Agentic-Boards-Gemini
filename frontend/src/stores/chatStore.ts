@@ -165,46 +165,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
         state.sessionId,
         content,
         {
-          onThinking: (data) => {
+          onThinking: (data: { message: string }) => {
             set({ thinkingMessage: data.message });
           },
-          onMessage: (data) => {
+          onMessage: (data: { content: string }) => {
             assistantContent += data.content;
           },
-          onVisualization: (data) => {
+          onVisualization: (data: { vega_spec: Record<string, unknown>; tile_id: string; query_meta?: { sql: string; params: Record<string, unknown> } }) => {
             get().addVisualizationCallback?.(data);
           },
-          onUpdateVisualization: (data) => {
+          onUpdateVisualization: (data: { vega_spec: Record<string, unknown>; tile_id: string }) => {
             get().updateVisualizationCallback?.(data);
           },
-          onUpdateLayout: (data) => {
+          onUpdateLayout: (data: { layouts: { tile_id: string; x: number; y: number; w: number; h: number }[] }) => {
             get().updateLayoutCallback?.(data);
           },
-          onDataTable: (data) => {
+          onDataTable: (data: { tile_id: string; title: string; columns: { field: string; headerName: string }[]; rows: Record<string, unknown>[]; query_meta?: { sql: string; params: Record<string, unknown> } }) => {
             get().dataTableCallback?.(data);
           },
-          onUpdateDataTable: (data) => {
+          onUpdateDataTable: (data: { tile_id: string; title: string; columns: { field: string; headerName: string }[]; rows: Record<string, unknown>[] }) => {
             get().updateDataTableCallback?.(data);
           },
-          onKpiTile: (data) => {
+          onKpiTile: (data: { tile_id: string; title: string; value: string; subtitle: string; color: string; sparkline?: number[]; query_meta?: { sql: string; params: Record<string, unknown>; type?: "bigquery" | "databricks" } }) => {
             get().kpiTileCallback?.(data);
           },
-          onTextTile: (data) => {
+          onTextTile: (data: { tile_id: string; title: string; markdown: string }) => {
             get().textTileCallback?.(data);
           },
-          onRemoveTile: (data) => {
+          onRemoveTile: (data: { tile_id: string }) => {
             get().removeTileCallback?.(data);
           },
-          onUpdateTileTitle: (data) => {
+          onUpdateTileTitle: (data: { tile_id: string; title: string }) => {
             get().updateTileTitleCallback?.(data);
           },
-          onUpdateText: (data) => {
+          onUpdateText: (data: { tile_id: string; markdown: string }) => {
             get().updateTextCallback?.(data);
           },
-          onAgentStep: (data) => {
+          onAgentStep: (data: import("@/lib/api").AgentStepData) => {
             useAgentStore.getState().upsertStep(data);
           },
-          onDone: (data) => {
+          onDone: (data: { session_id: string }) => {
             useAgentStore.getState().finishRun("done");
             const assistantMessage: Message = {
               id: crypto.randomUUID(),
@@ -220,7 +220,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               abortController: null,
             }));
           },
-          onError: (data) => {
+          onError: (data: { message: string }) => {
             useAgentStore.getState().finishRun("error");
             const errorMessage: Message = {
               id: crypto.randomUUID(),

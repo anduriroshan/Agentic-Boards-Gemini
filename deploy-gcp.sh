@@ -5,16 +5,13 @@
 GCP_PROJECT_ID=${GCP_PROJECT_ID:-$(gcloud config get-value project)}
 GCP_REGION=${GCP_REGION:-"us-central1"}
 SERVICE_NAME="agentic-boards"
-IMAGE_TAG="gcr.io/${GCP_PROJECT_ID}/${SERVICE_NAME}:latest"
-
-echo "🚀 Starting deployment for project: ${GCP_PROJECT_ID}"
-
 # 1. Parse backend/.env into gcloud format
 echo "📝 Parsing environment variables from backend/.env..."
-ENV_VARS=$(grep -v '^#' backend/.env | grep -v '^$' | xargs | sed 's/ /,/g')
+# More robust parsing: ignore comments/empty lines, handle quotes, join with commas
+ENV_VARS=$(grep -v '^#' backend/.env | grep -v '^$' | grep '=' | sed 's/"//g' | sed "s/'//g" | paste -sd "," -)
 
-# Load specifically for script use
-source <(grep -E '^(CLOUDFLARE|DOMAIN_NAME)' backend/.env)
+# Load specifically for script use (Cloudflare/Domain)
+source <(grep -E '^(CLOUDFLARE|DOMAIN_NAME)' backend/.env | sed 's/"//g' | sed "s/'//g")
 
 # 2. Ensure Artifact Registry exists
 REPO_NAME="app-repo"

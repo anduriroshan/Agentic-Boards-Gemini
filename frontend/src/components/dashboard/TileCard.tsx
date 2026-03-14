@@ -121,7 +121,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
                   if (!numericEntry) return null;
                   return asNumber(row[numericEntry[0]]);
                 })
-                .filter((n): n is number => n !== null);
+                .filter((n: number | null): n is number => n !== null);
               if (numericRows.length > 1) {
                 sparkline = numericRows;
               }

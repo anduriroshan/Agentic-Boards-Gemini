@@ -64,7 +64,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     load: async (id: string) => {
         const sessions = await listSessions();
-        const session = sessions.find((s) => s.id === id);
+        const session = sessions.find((s: SavedSession) => s.id === id);
         if (!session) return;
 
         set({ activeSessionId: session.id, activeSessionName: session.name });

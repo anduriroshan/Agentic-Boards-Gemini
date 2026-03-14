@@ -32,8 +32,9 @@ chmod +x deploy-gcp.sh
 
 The script will:
 - Build the Docker image using Cloud Build.
-- Push the image to your project's Container Registry.
-- Deploy a new revision to Google Cloud Run.
+- Push the image to Artifact Registry.
+- Deploy to Google Cloud Run with **GCS volume mounting** for SQLite persistence.
+- (Optional) Automate Cloudflare DNS records.
 
 ## Environment Variables
 
@@ -72,3 +73,16 @@ A `cloudbuild.yaml` is included. You can connect your GitHub repository to Cloud
 1.  Go to [Cloud Build Triggers](https://console.cloud.google.com/cloud-build/triggers).
 2.  Click **Connect Repository**.
 3.  Create a trigger using `cloudbuild.yaml`.
+
+## Data Persistence (GCS Mount)
+
+The app uses **Cloud Run Volume Mounts** to persist the SQLite database. 
+- A GCS bucket `[PROJECT-ID]-data` is created.
+- It is mounted to `/app/data` in the container.
+- If you lose your service account, the bucket remains safe.
+
+## Troubleshooting: "Account Deleted"
+
+If you see an error about a deleted account during build:
+1.  Run `gcloud iam service-accounts undelete [UID]` (UID is in the error message).
+2.  Ensure Cloud Build and Compute Engine APIs are enabled.
