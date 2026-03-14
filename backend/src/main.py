@@ -35,7 +35,8 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 allowed_origins = [
     "http://localhost:5173",
     "http://localhost:3000",
-    "https://agentic-boards.live"
+    "https://agentic-boards.live",
+    "http://agentic-boards.live"
 ]
 if os.getenv("ALLOWED_ORIGINS"):
     allowed_origins.extend(os.getenv("ALLOWED_ORIGINS").split(","))
