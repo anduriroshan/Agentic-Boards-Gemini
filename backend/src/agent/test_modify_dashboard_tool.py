@@ -1,6 +1,6 @@
 import json
 
-from src.agent.tools import create_kpi_tile, modify_dashboard
+from src.agent.tools import create_data_table, create_kpi_tile, modify_dashboard, update_data_table
 
 
 def _invoke(payload: str) -> dict:
@@ -80,6 +80,42 @@ def test_modify_dashboard_accepts_list_of_json_strings_with_nested_kpi_update():
     assert result["kpi_updates"][0]["subtitle"].startswith("Data range:")
 
 
+def test_modify_dashboard_accepts_camel_case_aliases_for_spec_updates():
+    out = modify_dashboard.invoke(
+        {
+            "modifications": {
+                "specUpdates": {
+                    "tileId": "tile-6",
+                    "vegaSpec": {"mark": {"type": "bar", "color": "#ff00aa"}},
+                }
+            }
+        }
+    )
+    result = json.loads(out)
+    assert "error" not in result
+    assert result.get("spec_updates")
+    assert result["spec_updates"][0]["tile_id"] == "tile-6"
+    assert isinstance(result["spec_updates"][0]["vega_spec"], dict)
+
+
+def test_modify_dashboard_accepts_direct_spec_patch_without_vega_spec_key():
+    out = modify_dashboard.invoke(
+        {
+            "modifications": {
+                "specUpdates": {
+                    "tileId": "tile-7",
+                    "encoding": {"color": {"field": "item_description", "type": "nominal"}},
+                }
+            }
+        }
+    )
+    result = json.loads(out)
+    assert "error" not in result
+    assert result.get("spec_updates")
+    assert result["spec_updates"][0]["tile_id"] == "tile-7"
+    assert result["spec_updates"][0]["vega_spec"]["encoding"]["color"]["field"] == "item_description"
+
+
 def test_create_kpi_tile_is_idempotent_for_same_payload():
     first = json.loads(create_kpi_tile.invoke({
         "title": "Maximum Revenue Collected",
@@ -96,3 +132,41 @@ def test_create_kpi_tile_is_idempotent_for_same_payload():
         "sparkline_data": "",
     }))
     assert first["tile_id"] == second["tile_id"]
+
+
+def test_create_data_table_normalizes_column_aliases_and_wrapped_rows():
+    out = create_data_table.invoke({
+        "title": "Recent Sales",
+        "columns": json.dumps([
+            {"name": "invoice_and_item_number", "label": "Invoice"},
+            {"column_name": "date"},
+            {"field": "store_name", "headerName": "Store"},
+        ]),
+        "rows": json.dumps({
+            "rows": [
+                {"invoice_and_item_number": "INV-1", "date": "2025-01-01", "store_name": "A"},
+                {"invoice_and_item_number": "INV-2", "date": "2025-01-02", "store_name": "B"},
+            ]
+        }),
+    })
+    result = json.loads(out)
+    assert [c["field"] for c in result["columns"]] == [
+        "invoice_and_item_number",
+        "date",
+        "store_name",
+    ]
+    assert result["rows"][0]["invoice_and_item_number"] == "INV-1"
+
+
+def test_update_data_table_converts_row_arrays_to_objects():
+    out = update_data_table.invoke({
+        "tile_id": "tile-table-1",
+        "title": "Recent Sales",
+        "columns": json.dumps(["invoice_and_item_number", "date"]),
+        "rows": json.dumps([["INV-1", "2025-01-01"], ["INV-2", "2025-01-02"]]),
+    })
+    result = json.loads(out)
+    assert result["rows"][0] == {
+        "invoice_and_item_number": "INV-1",
+        "date": "2025-01-01",
+    }

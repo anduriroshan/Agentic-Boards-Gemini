@@ -12,6 +12,12 @@ type TurnStateMessage = {
   tool?: string;
 };
 
+type ContextSyncMessage = {
+  type: "context_sync";
+  state: "received";
+  tiles?: number;
+};
+
 type ToolCallMessage = {
   type: "tool_call";
   name: string;
@@ -56,6 +62,8 @@ const LiveAgent: React.FC = () => {
   const pendingContextHashRef = useRef<string | null>(null);
   const lastSentContextHashRef = useRef<string | null>(null);
   const contextDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contextSyncRetryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const contextSyncAckRef = useRef(false);
   const processedToolCallKeysRef = useRef<Set<string>>(new Set());
   const lastToolMutationAtRef = useRef(0);
 
@@ -81,6 +89,13 @@ const LiveAgent: React.FC = () => {
     if (contextDebounceTimerRef.current) {
       clearTimeout(contextDebounceTimerRef.current);
       contextDebounceTimerRef.current = null;
+    }
+  };
+
+  const clearContextSyncRetryTimer = () => {
+    if (contextSyncRetryTimerRef.current) {
+      clearInterval(contextSyncRetryTimerRef.current);
+      contextSyncRetryTimerRef.current = null;
     }
   };
 
@@ -356,6 +371,7 @@ const LiveAgent: React.FC = () => {
     logger(`[STOP] ${reason}`);
 
     clearContextTimer();
+    clearContextSyncRetryTimer();
 
     const socket = socketRef.current;
     socketRef.current = null;
@@ -425,6 +441,8 @@ const LiveAgent: React.FC = () => {
 
     pendingContextPayloadRef.current = null;
     pendingContextHashRef.current = null;
+    lastSentContextHashRef.current = null;
+    contextSyncAckRef.current = false;
     processedToolCallKeysRef.current.clear();
     lastToolMutationAtRef.current = 0;
 
@@ -459,16 +477,211 @@ const LiveAgent: React.FC = () => {
   const handleToolCall = (name: string, args: any, queryMeta?: any) => {
     console.log("[LIVE] Tool call:", name, args, "queryMeta:", queryMeta);
 
-    const normalizeColumns = (cols: any) => {
+    const normalizeRows = (rows: any): Record<string, unknown>[] => {
+      const parsed = tryParse(rows);
+      const candidate = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (Array.isArray((parsed as any).rows) ? (parsed as any).rows : parsed)
+        : parsed;
+
+      if (!Array.isArray(candidate)) {
+        return [];
+      }
+
+      if (candidate.every((r) => r && typeof r === "object" && !Array.isArray(r))) {
+        return candidate as Record<string, unknown>[];
+      }
+
+      return [];
+    };
+
+    const normalizeColumns = (cols: any, rows: Record<string, unknown>[] = []) => {
       const parsed = tryParse(cols);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.map((c) => {
+      const fromPayload = Array.isArray(parsed) ? parsed : [];
+      const normalized = fromPayload.map((c) => {
         if (typeof c === "string") return { field: c, headerName: c };
+        const field = c?.field || c?.headerName || c?.name || c?.key || c?.column || c?.column_name;
         return {
-          field: c.field || c.headerName || "unknown",
-          headerName: c.headerName || c.field || "Unknown",
+          field: field || "",
+          headerName: c?.headerName || c?.header || c?.label || field || "",
         };
+      }).filter((c) => !!c.field);
+
+      const deduped: { field: string; headerName: string }[] = [];
+      const seen = new Set<string>();
+      normalized.forEach((c) => {
+        if (!seen.has(c.field)) {
+          seen.add(c.field);
+          deduped.push({ field: c.field, headerName: c.headerName || c.field });
+        }
       });
+
+      if (deduped.length > 0) {
+        return deduped;
+      }
+
+      const firstRow = rows[0];
+      if (firstRow && typeof firstRow === "object") {
+        return Object.keys(firstRow).map((field) => ({ field, headerName: field }));
+      }
+
+      return [];
+    };
+
+    const asUpdateList = (value: any): any[] => {
+      if (Array.isArray(value)) {
+        return value.filter((v) => v && typeof v === "object");
+      }
+      if (value && typeof value === "object") {
+        return [value];
+      }
+      return [];
+    };
+
+    const normalizeTileId = (update: any): string | undefined => {
+      const tileId = update?.tile_id || update?.tileId;
+      return typeof tileId === "string" ? tileId : undefined;
+    };
+
+    const extractSpecPatch = (update: any): Record<string, unknown> | null => {
+      const nested = update?.vega_spec ?? update?.vegaSpec ?? update?.spec;
+      if (nested !== undefined) {
+        const parsed = tryParse(nested);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+      }
+
+      const directPatchEntries = Object.entries(update || {}).filter(
+        ([k]) => !["tile_id", "tileId", "vega_spec", "vegaSpec", "spec"].includes(k),
+      );
+      if (directPatchEntries.length === 0) {
+        return null;
+      }
+      return Object.fromEntries(directPatchEntries);
+    };
+
+    const deepMerge = (base: any, patch: any): any => {
+      if (Array.isArray(patch) || patch === null || typeof patch !== "object") {
+        return patch;
+      }
+      if (!base || typeof base !== "object" || Array.isArray(base)) {
+        return patch;
+      }
+      const out: Record<string, unknown> = { ...base };
+      Object.keys(patch).forEach((key) => {
+        const next = (patch as Record<string, unknown>)[key];
+        const prev = (base as Record<string, unknown>)[key];
+        if (
+          next
+          && typeof next === "object"
+          && !Array.isArray(next)
+          && prev
+          && typeof prev === "object"
+          && !Array.isArray(prev)
+        ) {
+          out[key] = deepMerge(prev, next);
+          return;
+        }
+        out[key] = next;
+      });
+      return out;
+    };
+
+    const normalizeModifyPayload = (raw: any): Record<string, any> | null => {
+      const parsedRaw = tryParse(raw);
+
+      type ModifyBucket = {
+        spec_updates: any[];
+        layout_updates: any[];
+        title_updates: any[];
+        kpi_updates: any[];
+        text_updates: any[];
+      };
+
+      const bucket: ModifyBucket = {
+        spec_updates: [],
+        layout_updates: [],
+        title_updates: [],
+        kpi_updates: [],
+        text_updates: [],
+      };
+
+      const pushWithTileId = (target: keyof ModifyBucket, value: any, tileId?: string) => {
+        if (!value || typeof value !== "object") return;
+        const withTile = tileId && !value.tile_id && !value.tileId ? { ...value, tile_id: tileId } : value;
+        bucket[target].push(withTile);
+      };
+
+      const consumeGroup = (target: keyof ModifyBucket, value: any, tileId?: string) => {
+        const group = tryParse(value);
+        if (Array.isArray(group)) {
+          group.forEach((g) => pushWithTileId(target, g, tileId));
+          return true;
+        }
+        if (group && typeof group === "object") {
+          pushWithTileId(target, group, tileId);
+          return true;
+        }
+        return false;
+      };
+
+      const consumeItem = (itemRaw: any) => {
+        const item = tryParse(itemRaw);
+        if (!item || typeof item !== "object" || Array.isArray(item)) return;
+        const tileId = normalizeTileId(item);
+
+        if (
+          consumeGroup("spec_updates", (item as any).spec_updates, tileId)
+          || consumeGroup("spec_updates", (item as any).specUpdates, tileId)
+          || consumeGroup("layout_updates", (item as any).layout_updates, tileId)
+          || consumeGroup("layout_updates", (item as any).layoutUpdates, tileId)
+          || consumeGroup("title_updates", (item as any).title_updates, tileId)
+          || consumeGroup("title_updates", (item as any).titleUpdates, tileId)
+          || consumeGroup("kpi_updates", (item as any).kpi_updates, tileId)
+          || consumeGroup("kpi_updates", (item as any).kpiUpdates, tileId)
+          || consumeGroup("text_updates", (item as any).text_updates, tileId)
+          || consumeGroup("text_updates", (item as any).textUpdates, tileId)
+        ) {
+          return;
+        }
+
+        // Infer a direct single-update object.
+        if (
+          "vega_spec" in item
+          || "vegaSpec" in item
+          || "spec" in item
+          || "mark" in item
+          || "encoding" in item
+          || "layer" in item
+          || "data" in item
+        ) {
+          pushWithTileId("spec_updates", item, tileId);
+        } else if ("x" in item && "y" in item && "w" in item && "h" in item) {
+          pushWithTileId("layout_updates", item, tileId);
+        } else if ("markdown" in item) {
+          pushWithTileId("text_updates", item, tileId);
+        } else if ("value" in item || "subtitle" in item || "color" in item) {
+          pushWithTileId("kpi_updates", item, tileId);
+        } else if ("title" in item) {
+          pushWithTileId("title_updates", item, tileId);
+        }
+      };
+
+      if (Array.isArray(parsedRaw)) {
+        parsedRaw.forEach((entry) => consumeItem(entry));
+      } else if (parsedRaw && typeof parsedRaw === "object") {
+        consumeItem(parsedRaw);
+      } else {
+        return null;
+      }
+
+      return {
+        spec_updates: bucket.spec_updates,
+        layout_updates: bucket.layout_updates,
+        title_updates: bucket.title_updates,
+        kpi_updates: bucket.kpi_updates,
+        text_updates: bucket.text_updates,
+      };
     };
 
     switch (name) {
@@ -477,22 +690,30 @@ const LiveAgent: React.FC = () => {
         markToolMutation();
         break;
       case "create_data_table":
+      {
+        const rows = normalizeRows(args.rows);
+        const columns = normalizeColumns(args.columns, rows);
         addTableTile(
           args.tile_id || crypto.randomUUID(),
-          { columns: normalizeColumns(args.columns), rows: tryParse(args.rows) },
+          { columns, rows },
           args.title || "Data Table",
           queryMeta,
         );
         markToolMutation();
         break;
+      }
       case "update_data_table":
+      {
+        const rows = normalizeRows(args.rows);
+        const columns = normalizeColumns(args.columns, rows);
         updateTableTile(
           args.tile_id,
-          { columns: normalizeColumns(args.columns), rows: tryParse(args.rows) },
+          { columns, rows },
           args.title,
         );
         markToolMutation();
         break;
+      }
       case "create_kpi_tile":
         addKpiTile(
           args.tile_id || crypto.randomUUID(),
@@ -511,8 +732,8 @@ const LiveAgent: React.FC = () => {
         markToolMutation();
         break;
       case "modify_dashboard": {
-        const mods = tryParse(args.modifications);
-        if (!mods || typeof mods !== "object") {
+        const mods = normalizeModifyPayload(args.modifications);
+        if (!mods) {
           logger("[MODIFY] Invalid modifications payload (non-object)");
           break;
         }
@@ -528,67 +749,81 @@ const LiveAgent: React.FC = () => {
           }
         };
 
-        const layoutUpdatesRaw = Array.isArray(mods.layout_updates) ? mods.layout_updates : [];
+        const layoutUpdatesRaw = asUpdateList((mods as any).layout_updates);
         requestedOps += layoutUpdatesRaw.length;
-        const layoutUpdates = layoutUpdatesRaw.filter((u: { tile_id?: string }) => {
-          const found = !!u.tile_id && existingIds.has(u.tile_id);
-          if (!found) recordMissing(u.tile_id);
+        const layoutUpdates = layoutUpdatesRaw.filter((u: any) => {
+          const tileId = normalizeTileId(u);
+          const found = !!tileId && existingIds.has(tileId);
+          if (!found) recordMissing(tileId);
           return found;
         });
         if (layoutUpdates.length > 0) {
-          updateTileLayouts(layoutUpdates);
+          updateTileLayouts(layoutUpdates.map((u: any) => ({ ...u, tile_id: normalizeTileId(u) })));
           appliedOps += layoutUpdates.length;
         }
 
-        const titleUpdates = Array.isArray(mods.title_updates) ? mods.title_updates : [];
+        const titleUpdates = asUpdateList((mods as any).title_updates);
         requestedOps += titleUpdates.length;
-        titleUpdates.forEach((u: { tile_id: string; title: string }) => {
-          if (!existingIds.has(u.tile_id)) {
-            recordMissing(u.tile_id);
+        titleUpdates.forEach((u: any) => {
+          const tileId = normalizeTileId(u);
+          if (!tileId || !existingIds.has(tileId)) {
+            recordMissing(tileId);
             return;
           }
-          updateTileTitle(u.tile_id, u.title);
+          updateTileTitle(tileId, u.title);
           appliedOps += 1;
         });
 
-        const specUpdates = Array.isArray(mods.spec_updates) ? mods.spec_updates : [];
+        const specUpdates = asUpdateList((mods as any).spec_updates);
         requestedOps += specUpdates.length;
-        specUpdates.forEach((u: { tile_id: string; vega_spec: any }) => {
-          if (!existingIds.has(u.tile_id)) {
-            recordMissing(u.tile_id);
+        specUpdates.forEach((u: any) => {
+          const tileId = normalizeTileId(u);
+          if (!tileId || !existingIds.has(tileId)) {
+            recordMissing(tileId);
             return;
           }
-          updateTile(u.tile_id, tryParse(u.vega_spec));
+          const incomingSpec = extractSpecPatch(u);
+          if (!incomingSpec || typeof incomingSpec !== "object") {
+            recordMissing(tileId);
+            return;
+          }
+          const existingTile = useDashboardStore.getState().tiles.find((t) => t.id === tileId && t.type === "chart");
+          const mergedSpec = existingTile?.vegaSpec ? deepMerge(existingTile.vegaSpec, incomingSpec) : incomingSpec;
+          updateTile(tileId, mergedSpec);
           appliedOps += 1;
         });
 
-        const kpiUpdates = Array.isArray(mods.kpi_updates) ? mods.kpi_updates : [];
+        const kpiUpdates = asUpdateList((mods as any).kpi_updates);
         requestedOps += kpiUpdates.length;
-        kpiUpdates.forEach((u: { tile_id: string; value?: string; subtitle?: string; color?: string }) => {
-          if (!existingIds.has(u.tile_id)) {
-            recordMissing(u.tile_id);
+        kpiUpdates.forEach((u: any) => {
+          const tileId = normalizeTileId(u);
+          if (!tileId || !existingIds.has(tileId)) {
+            recordMissing(tileId);
             return;
           }
+          const existingTile = useDashboardStore.getState().tiles.find((t) => t.id === tileId && t.type === "kpi");
+          const existingKpi = existingTile?.kpiData;
           addKpiTile(
-            u.tile_id,
+            tileId,
             {
-              value: u.value || "",
-              subtitle: u.subtitle || "",
-              color: u.color || "",
+              value: u.value ?? existingKpi?.value ?? "",
+              subtitle: u.subtitle ?? existingKpi?.subtitle ?? "",
+              color: u.color ?? existingKpi?.color ?? "",
             },
             "",
           );
           appliedOps += 1;
         });
 
-        const textUpdates = Array.isArray(mods.text_updates) ? mods.text_updates : [];
+        const textUpdates = asUpdateList((mods as any).text_updates);
         requestedOps += textUpdates.length;
-        textUpdates.forEach((u: { tile_id: string; markdown: string }) => {
-          if (!existingIds.has(u.tile_id)) {
-            recordMissing(u.tile_id);
+        textUpdates.forEach((u: any) => {
+          const tileId = normalizeTileId(u);
+          if (!tileId || !existingIds.has(tileId)) {
+            recordMissing(tileId);
             return;
           }
-          updateTextTile(u.tile_id, u.markdown);
+          updateTextTile(tileId, u.markdown);
           appliedOps += 1;
         });
 
@@ -604,6 +839,8 @@ const LiveAgent: React.FC = () => {
             status: "done",
             ts: Date.now(),
           });
+        } else if (requestedOps === 0) {
+          logger("[MODIFY] No recognizable update operations were found in modifications payload");
         } else {
           logger(`[MODIFY] Applied ${appliedOps}/${requestedOps} requested updates`);
           if (appliedOps > 0) {
@@ -750,6 +987,9 @@ const LiveAgent: React.FC = () => {
         if (!isActiveRef.current || !socket || socket.readyState !== WebSocket.OPEN) {
           return;
         }
+        if (!contextSyncAckRef.current) {
+          return;
+        }
 
         const input = e.inputBuffer.getChannelData(0);
         const pcmData = new Int16Array(input.length);
@@ -776,9 +1016,29 @@ const LiveAgent: React.FC = () => {
         isActiveRef.current = true;
         setIsConnecting(false);
         currentRunId.current = startRun("Live Voice Session");
+        contextSyncAckRef.current = false;
+        clearContextSyncRetryTimer();
 
         queueContextUpdate();
         void flushContextUpdateIfSafe();
+
+        const retryStartTs = Date.now();
+        contextSyncRetryTimerRef.current = setInterval(() => {
+          if (!isActiveRef.current || contextSyncAckRef.current) {
+            clearContextSyncRetryTimer();
+            return;
+          }
+
+          if (Date.now() - retryStartTs > 8000) {
+            logger("[CONTEXT] context_sync timeout; allowing mic stream as fallback");
+            contextSyncAckRef.current = true;
+            clearContextSyncRetryTimer();
+            return;
+          }
+
+          queueContextUpdate();
+          void flushContextUpdateIfSafe();
+        }, 800);
       };
 
       socket.onmessage = (event) => {
@@ -806,6 +1066,15 @@ const LiveAgent: React.FC = () => {
 
             if (msg.type === "turn_state") {
               handleTurnState(msg as TurnStateMessage);
+              return;
+            }
+
+            if (msg.type === "context_sync") {
+              const sync = msg as ContextSyncMessage;
+              contextSyncAckRef.current = true;
+              clearContextSyncRetryTimer();
+              logger(`[CONTEXT] context_sync received (${sync.tiles ?? 0} tiles)`);
+              return;
             }
           } catch (e) {
             console.error("[ERROR] Failed to parse websocket message:", e);
@@ -857,6 +1126,9 @@ const LiveAgent: React.FC = () => {
 
     const msSinceToolMutation = Date.now() - lastToolMutationAtRef.current;
     if (msSinceToolMutation >= 0 && msSinceToolMutation < 4000) {
+      clearContextTimer();
+      pendingContextPayloadRef.current = null;
+      pendingContextHashRef.current = null;
       logger(`[CONTEXT] Suppressed auto context_update after tool mutation (${msSinceToolMutation}ms)`);
       return;
     }

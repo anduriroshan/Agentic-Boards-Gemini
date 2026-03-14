@@ -55,7 +55,9 @@ async def websocket_endpoint(websocket: WebSocket):
     _session_activity_log.set(log)
     _current_websocket.set(websocket)
 
-    agent = get_adk_agent("The dashboard is currently empty.")
+    agent = get_adk_agent(
+        "Dashboard state will be provided by context_update messages; do not assume it is empty."
+    )
 
     session_service = sessions.InMemorySessionService()
     live_request_queue = LiveRequestQueue()
@@ -71,6 +73,7 @@ async def websocket_endpoint(websocket: WebSocket):
     live_request_queue_closed = False
     last_sql_info = {"sql": None, "provider": "bigquery"}
     processed_tool_call_keys: set[str] = set()
+    initial_context_synced = False
 
     async def send_json_safe(payload: dict[str, Any]) -> bool:
         if websocket.client_state != WebSocketState.CONNECTED:
@@ -124,6 +127,7 @@ async def websocket_endpoint(websocket: WebSocket):
         )
 
     async def flush_pending_context_if_safe():
+        nonlocal initial_context_synced
         if not coordinator.should_flush_context():
             return
 
@@ -141,6 +145,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
             )
             coordinator.last_context_hash = pending.payload_hash
+            if not initial_context_synced:
+                await send_json_safe({"type": "context_sync", "state": "received", "tiles": len(tiles)})
+                initial_context_synced = True
         except Exception as e:
             logger.error("[WS] Failed to inject queued context_update: %s", e)
             coordinator.pending_context = pending

@@ -124,6 +124,95 @@ def _stable_tile_id(prefix: str, payload: object) -> str:
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{prefix}:{canonical}"))
 
+
+def _extract_rows_payload(raw_rows: object) -> list[object]:
+    """Accept common row payload wrappers and return a list."""
+    candidate = raw_rows
+    if isinstance(candidate, dict):
+        if isinstance(candidate.get("rows"), list):
+            candidate = candidate.get("rows")
+        elif isinstance(candidate.get("data"), list):
+            candidate = candidate.get("data")
+    return candidate if isinstance(candidate, list) else []
+
+
+def _extract_columns_payload(raw_columns: object) -> list[object]:
+    """Accept common column payload wrappers and return a list."""
+    candidate = raw_columns
+    if isinstance(candidate, dict):
+        if isinstance(candidate.get("columns"), list):
+            candidate = candidate.get("columns")
+        elif isinstance(candidate.get("fields"), list):
+            candidate = candidate.get("fields")
+    return candidate if isinstance(candidate, list) else []
+
+
+def _normalize_table_columns_and_rows(raw_columns: object, raw_rows: object) -> tuple[list[dict[str, str]], list[dict[str, object]]]:
+    cols = _extract_columns_payload(raw_columns)
+    rows_in = _extract_rows_payload(raw_rows)
+
+    normalized_columns: list[dict[str, str]] = []
+    for col in cols:
+        field = ""
+        header = ""
+        if isinstance(col, str):
+            field = col.strip()
+            header = field
+        elif isinstance(col, dict):
+            field = str(
+                col.get("field")
+                or col.get("headerName")
+                or col.get("name")
+                or col.get("key")
+                or col.get("column")
+                or col.get("column_name")
+                or ""
+            ).strip()
+            header = str(
+                col.get("headerName")
+                or col.get("header")
+                or col.get("label")
+                or col.get("name")
+                or col.get("column_name")
+                or field
+            ).strip()
+        if field:
+            normalized_columns.append({"field": field, "headerName": header or field})
+
+    # Keep first occurrence for duplicate field names.
+    deduped_columns: list[dict[str, str]] = []
+    seen_fields: set[str] = set()
+    for col in normalized_columns:
+        field = col["field"]
+        if field in seen_fields:
+            continue
+        seen_fields.add(field)
+        deduped_columns.append(col)
+    normalized_columns = deduped_columns
+
+    normalized_rows: list[dict[str, object]] = []
+    if rows_in and all(isinstance(r, dict) for r in rows_in):
+        normalized_rows = [r for r in rows_in if isinstance(r, dict)]  # type: ignore[list-item]
+    elif rows_in and all(isinstance(r, (list, tuple)) for r in rows_in):
+        # Convert row arrays to objects using normalized column field order.
+        fields = [c["field"] for c in normalized_columns]
+        for row in rows_in:
+            if not isinstance(row, (list, tuple)):
+                continue
+            row_dict: dict[str, object] = {}
+            for idx, val in enumerate(row):
+                key = fields[idx] if idx < len(fields) and fields[idx] else f"column_{idx + 1}"
+                row_dict[key] = val
+            normalized_rows.append(row_dict)
+    elif rows_in:
+        normalized_rows = [{"value": v} for v in rows_in]
+
+    if (not normalized_columns) and normalized_rows:
+        first = normalized_rows[0]
+        normalized_columns = [{"field": k, "headerName": k} for k in first.keys()]
+
+    return normalized_columns, normalized_rows
+
 # ═════════════════════════════════════════════════════════════════════════════
 # Tool 1 – Search Metadata
 # ═════════════════════════════════════════════════════════════════════════════
@@ -607,27 +696,51 @@ def modify_dashboard(modifications: str | dict[str, Any] | list[Any]) -> str:
     if not isinstance(mods, dict):
         return json.dumps({"error": "Invalid modifications payload. Expected an object or list of update objects."})
 
+    def _as_update_list(value: object) -> list[dict[str, Any]]:
+        if isinstance(value, list):
+            return [v for v in value if isinstance(v, dict)]
+        if isinstance(value, dict):
+            return [value]
+        return []
+
+    def _with_tile_id(update: dict[str, Any]) -> dict[str, Any]:
+        tile_id = update.get("tile_id") or update.get("tileId")
+        if tile_id and "tile_id" not in update:
+            return {**update, "tile_id": tile_id}
+        return update
+
     result: dict = {"action": "modify_dashboard"}
 
-    spec_updates = mods.get("spec_updates", [])
-    layout_updates = mods.get("layout_updates", [])
-    title_updates = mods.get("title_updates", [])
-    kpi_updates = mods.get("kpi_updates", [])
-    text_updates = mods.get("text_updates", [])
+    spec_updates = _as_update_list(mods.get("spec_updates") or mods.get("specUpdates"))
+    layout_updates = _as_update_list(mods.get("layout_updates") or mods.get("layoutUpdates"))
+    title_updates = _as_update_list(mods.get("title_updates") or mods.get("titleUpdates"))
+    kpi_updates = _as_update_list(mods.get("kpi_updates") or mods.get("kpiUpdates"))
+    text_updates = _as_update_list(mods.get("text_updates") or mods.get("textUpdates"))
 
     if spec_updates:
         # Normalise each spec_update: parse vega_spec if the LLM sent it as a
         # JSON string instead of an object, and inject $schema if missing.
-        valid_spec_updates = [su for su in spec_updates if isinstance(su, dict)]
         normalised_spec_updates = []
-        for su in valid_spec_updates:
-            vs = su.get("vega_spec")
+        for su in spec_updates:
+            su = _with_tile_id(su)
+            vs = su.get("vega_spec") or su.get("vegaSpec") or su.get("spec")
+            if vs is None:
+                # Some model outputs place patch keys directly on the update
+                # object (alongside tile_id) instead of nesting under vega_spec.
+                # Treat the remaining keys as a partial Vega-Lite patch.
+                direct_patch = {
+                    k: v
+                    for k, v in su.items()
+                    if k not in ("tile_id", "tileId", "vega_spec", "vegaSpec", "spec")
+                }
+                if direct_patch:
+                    vs = direct_patch
             if isinstance(vs, str):
                 try:
                     vs = _parse_llm_json(vs)
                 except json.JSONDecodeError as e:
                     return json.dumps({"error": f"Invalid vega_spec JSON in spec_updates: {e}"})
-            if isinstance(vs, dict) and "$schema" not in vs:
+            if isinstance(vs, dict) and "$schema" not in vs and any(k in vs for k in ("mark", "encoding", "layer", "data")):
                 vs["$schema"] = "https://vega.github.io/schema/vega-lite/v5.json"
             normalised_spec_updates.append({**su, "vega_spec": vs})
         
@@ -639,7 +752,7 @@ def modify_dashboard(modifications: str | dict[str, Any] | list[Any]) -> str:
             )
 
     if layout_updates:
-        valid_layout_updates = [u for u in layout_updates if isinstance(u, dict)]
+        valid_layout_updates = [_with_tile_id(u) for u in layout_updates]
         if valid_layout_updates:
             result["layout_updates"] = valid_layout_updates
             logger.info(
@@ -648,7 +761,7 @@ def modify_dashboard(modifications: str | dict[str, Any] | list[Any]) -> str:
             )
 
     if title_updates:
-        valid_title_updates = [u for u in title_updates if isinstance(u, dict)]
+        valid_title_updates = [_with_tile_id(u) for u in title_updates]
         if valid_title_updates:
             result["title_updates"] = valid_title_updates
             logger.info(
@@ -657,7 +770,7 @@ def modify_dashboard(modifications: str | dict[str, Any] | list[Any]) -> str:
             )
 
     if kpi_updates:
-        valid_kpi_updates = [u for u in kpi_updates if isinstance(u, dict)]
+        valid_kpi_updates = [_with_tile_id(u) for u in kpi_updates]
         if valid_kpi_updates:
             result["kpi_updates"] = valid_kpi_updates
             logger.info(
@@ -666,7 +779,7 @@ def modify_dashboard(modifications: str | dict[str, Any] | list[Any]) -> str:
             )
 
     if text_updates:
-        valid_text_updates = [u for u in text_updates if isinstance(u, dict)]
+        valid_text_updates = [_with_tile_id(u) for u in text_updates]
         if valid_text_updates:
             result["text_updates"] = valid_text_updates
             logger.info(
@@ -674,7 +787,7 @@ def modify_dashboard(modifications: str | dict[str, Any] | list[Any]) -> str:
                 [u.get("tile_id") for u in valid_text_updates],
             )
 
-    if not spec_updates and not layout_updates and not title_updates and not kpi_updates and not text_updates:
+    if not any(k in result for k in ("spec_updates", "layout_updates", "title_updates", "kpi_updates", "text_updates")):
         result["error"] = "No spec_updates, layout_updates, title_updates, kpi_updates, or text_updates provided."
 
     return json.dumps(result)
@@ -721,19 +834,21 @@ def create_data_table(title: str, columns: str, rows: str) -> str:
     except json.JSONDecodeError as e:
         return _safe_json_dumps({"error": f"Invalid rows JSON: {e}"})
 
+    normalized_columns, normalized_rows = _normalize_table_columns_and_rows(col_defs, row_data)
+
     tile_id = str(uuid.uuid4())
 
     logger.info(
         "[TOOL:create_data_table] tile=%s  cols=%d  rows=%d",
-        tile_id, len(col_defs), len(row_data),
+        tile_id, len(normalized_columns), len(normalized_rows),
     )
 
     return _safe_json_dumps({
         "action": "create_data_table",
         "tile_id": tile_id,
         "title": title,
-        "columns": col_defs,
-        "rows": row_data,
+        "columns": normalized_columns,
+        "rows": normalized_rows,
     })
 
 
@@ -780,17 +895,19 @@ def update_data_table(tile_id: str, title: str, columns: str, rows: str) -> str:
     except json.JSONDecodeError as e:
         return _safe_json_dumps({"error": f"Invalid rows JSON: {e}"})
 
+    normalized_columns, normalized_rows = _normalize_table_columns_and_rows(col_defs, row_data)
+
     logger.info(
         "[TOOL:update_data_table] tile=%s  cols=%d  rows=%d",
-        tile_id, len(col_defs), len(row_data),
+        tile_id, len(normalized_columns), len(normalized_rows),
     )
 
     return _safe_json_dumps({
         "action": "update_data_table",
         "tile_id": tile_id,
         "title": title,
-        "columns": col_defs,
-        "rows": row_data,
+        "columns": normalized_columns,
+        "rows": normalized_rows,
     })
 
 
