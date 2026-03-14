@@ -13,6 +13,14 @@ This guide explains how to deploy the Agentic Boards application to Google Cloud
                            cloudbuild.googleapis.com
     ```
 
+4.  **Service Account Permissions**:
+    Instead of using a `service_account.json` file, Cloud Run uses **Application Default Credentials (ADC)**. This is safer because you don't need to push keys to GitHub.
+    
+    Grant your project's service account (usually `[PROJECT_NUMBER]-compute@developer.gserviceaccount.com`) the following roles in the [IAM Console](https://console.cloud.google.com/iam-admin/iam):
+    - `BigQuery Admin` (If using BigQuery)
+    - `Vertex AI User` (If using Gemini)
+    - `Storage Admin` (To allow the deployment script to create/mount the persistence bucket)
+
 ## Quick Deployment
 
 Use the provided automated script:
@@ -29,11 +37,13 @@ The script will:
 
 ## Environment Variables
 
-Cloud Run services need environment variables to function correctly. The frontend is configured to use relative paths (`/api`), so it will automatically point to the correct domain when deployed.
+The `deploy-gcp.sh` script **automatically** reads your `backend/.env` file and pushes all variables to Cloud Run. You don't need to add them manually in the terminal.
+
+If you ever need to update a single variable *without* re-deploying the whole app, you can use:
 
 ```bash
 gcloud run services update agentic-boards \
-  --set-env-vars="GEMINI_API_KEY=your_key,LLM_MODE=gemini,ALLOWED_ORIGINS=https://agentic-boards.live"
+  --set-env-vars="GEMINI_API_KEY=your_key,ALLOWED_ORIGINS=https://agentic-boards.live"
 ```
 
 > [!TIP]
@@ -41,8 +51,11 @@ gcloud run services update agentic-boards \
 
 ## Custom Domain (Cloudflare)
 
-Since you have `agentic-boards.live` on Cloudflare, follow these steps to connect it to Cloud Run:
+Deployment and DNS are now **fully automated**! If you provide the Cloudflare variables in your `.env`, the script will:
+1.  Map the domain in Google Cloud.
+2.  Update your Cloudflare CNAME record to point to Google.
 
+If you prefer to do it manually:
 1.  **GCP Console**: Go to **Cloud Run** -> select `agentic-boards` -> **Manage Custom Domains**.
 2.  **Add Mapping**: Click **Add Mapping**, select your domain, and follow the verification steps (Google may ask you to add a TXT record to Cloudflare to prove ownership).
 3.  **DNS Records**: Once verified, Google will provide you with DNS records (usually a **CNAME** pointing to `ghs.googlehosted.com` or a set of **A/AAAA** records).

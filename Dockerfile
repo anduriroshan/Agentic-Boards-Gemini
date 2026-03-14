@@ -5,8 +5,7 @@ FROM ghcr.io/astral-sh/uv:latest AS uv_bin
 FROM node:20-slim AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm install
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -21,12 +20,12 @@ ENV PATH="/uv/bin:$PATH"
 # Install system dependencies if needed
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    && mkdir -p /app/data \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy backend requirements and install with uv
 COPY backend/pyproject.toml ./backend/
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --no-cache-dir --system ./backend/
+RUN uv pip install --no-cache-dir --system ./backend/
 
 # Copy backend source
 COPY backend/src ./src
