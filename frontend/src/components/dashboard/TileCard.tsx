@@ -46,6 +46,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
   const [showComments, setShowComments] = useState(false);
   const [showTextSettings, setShowTextSettings] = useState(false);
   const [showKpiSettings, setShowKpiSettings] = useState(false);
+  const [showHeaderActions, setShowHeaderActions] = useState(true);
   const [autoRefreshMs, setAutoRefreshMs] = useState(0);
 
   const filters = useFilterStore((s) => s.filters);
@@ -214,50 +215,65 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
           <h3 className="text-sm font-medium truncate">{tile.title}</h3>
         </div>
         <div className="flex items-center gap-1 ml-2">
-          {onBringToFront && (
-            <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onBringToFront();
-              }}
-              className="text-sm px-1 text-muted-foreground hover:text-foreground transition-colors"
-              title="Bring Forward"
-            >
-              ↑
-            </button>
-          )}
-          {onSendToBack && (
-            <button
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSendToBack();
-              }}
-              className="text-sm px-1 text-muted-foreground hover:text-foreground transition-colors"
-              title="Send Backward"
-            >
-              ↓
-            </button>
-          )}
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              setShowComments(!showComments);
+              setShowHeaderActions((prev) => !prev);
             }}
-            className={`text-sm px-1 transition-colors relative ${showComments ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              }`}
-            title="Comments"
+            className="text-base px-1 text-foreground hover:text-primary transition-colors"
+            title={showHeaderActions ? "Collapse tile controls" : "Expand tile controls"}
           >
-            💬
-            {(tile.comments?.length ?? 0) > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
-                {tile.comments!.length}
-              </span>
-            )}
+            {showHeaderActions ? "<" : ">"}
           </button>
-          {hasQueryMeta && (
+          {showHeaderActions && (
+            <>
+              {onBringToFront && (
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onBringToFront();
+                  }}
+                  className="text-sm px-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Bring Forward"
+                >
+                  ↑
+                </button>
+              )}
+              {onSendToBack && (
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSendToBack();
+                  }}
+                  className="text-sm px-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Send Backward"
+                >
+                  ↓
+                </button>
+              )}
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowComments(!showComments);
+                }}
+                className={`text-sm px-1 transition-colors relative ${showComments ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                title="Comments"
+              >
+                💬
+                {(tile.comments?.length ?? 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                    {tile.comments!.length}
+                  </span>
+                )}
+              </button>
+            </>
+          )}
+          {showHeaderActions && hasQueryMeta && (
             <>
               {hasParams && (
                 <button
@@ -303,7 +319,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
               )}
             </>
           )}
-          {autoRefreshMs > 0 && (
+          {showHeaderActions && autoRefreshMs > 0 && (
             <span
               className="text-[10px] text-green-500 px-1"
               title={`Auto-refreshing every ${autoRefreshMs / 1000}s`}
@@ -311,7 +327,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
               ●
             </span>
           )}
-          {tile.type === "text" && (
+          {showHeaderActions && tile.type === "text" && (
             <button
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -325,17 +341,19 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
               ⚙
             </button>
           )}
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              removeTile(tile.id);
-            }}
-            className="text-muted-foreground hover:text-destructive text-sm px-1 ml-1 z-10"
-            title="Remove tile"
-          >
-            &times;
-          </button>
+          {showHeaderActions && (
+            <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                removeTile(tile.id);
+              }}
+              className="text-muted-foreground hover:text-destructive text-sm px-1 ml-1 z-10"
+              title="Remove tile"
+            >
+              &times;
+            </button>
+          )}
         </div>
       </div>
 
