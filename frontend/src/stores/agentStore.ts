@@ -39,6 +39,8 @@ export interface AgentSession {
 
 interface AgentActivityState {
   sessions: AgentSession[];
+  activeConnection: "databricks" | "bigquery";
+  setActiveConnection: (connection: "databricks" | "bigquery") => void;
   newSession: () => void;
   startRun: (message: string) => string;
   upsertStep: (step: AgentStep) => void;
@@ -57,6 +59,9 @@ function makeSession(): AgentSession {
 
 export const useAgentStore = create<AgentActivityState>((set) => ({
   sessions: [makeSession()],
+  activeConnection: "databricks",
+
+  setActiveConnection: (connection) => set({ activeConnection: connection }),
 
   newSession: () => {
     set((s) => {

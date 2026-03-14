@@ -10,7 +10,9 @@ import {
   MessageCircle,
   Send,
   StopCircle,
+  Mic,
 } from "lucide-react";
+import LiveAgent from "./LiveAgent";
 
 // ─── Past session viewer ─────────────────────────────────────────────────────
 
@@ -18,7 +20,7 @@ function SessionHistoryItem({ session }: { session: SessionRecord }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border-b border-gray-100 last:border-0">
+    <div className="border-b border-gray-100 last:border-0 text-gray-800">
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
@@ -46,10 +48,10 @@ function SessionHistoryItem({ session }: { session: SessionRecord }) {
             >
               <div
                 className={cn(
-                  "rounded-lg px-2.5 py-1.5 text-xs max-w-[85%] w-fit",
+                  "rounded-2xl px-3 py-1.5 text-xs max-w-[85%] w-fit",
                   msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-gray-100 text-gray-700",
+                    ? "bg-purple-600 text-white rounded-tr-none"
+                    : "bg-gray-200 text-gray-800 rounded-tl-none",
                 )}
               >
                 {msg.content}
@@ -90,12 +92,13 @@ export default function ChatPanel({ collapsed = false, onToggle }: ChatPanelProp
 
   const [input, setInput] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"chat" | "live">("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!collapsed)
+    if (!collapsed && activeTab === "chat")
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, thinkingMessage, collapsed]);
+  }, [messages, thinkingMessage, collapsed, activeTab]);
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -112,163 +115,177 @@ export default function ChatPanel({ collapsed = false, onToggle }: ChatPanelProp
   };
 
   return (
-    <div className="h-full flex flex-col bg-card overflow-hidden">
-      {/* ── header — always visible, click icon+title area to collapse ── */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b shrink-0">
-        {/* left: toggle button */}
-        <button
-          onClick={onToggle}
-          className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-70 transition-opacity text-left"
-        >
-          <MessageCircle className="w-4 h-4 text-gray-500 shrink-0" />
-          <span className="text-xs font-semibold text-gray-700 tracking-wide flex-1">
-            Chat
-          </span>
-          {collapsed ? (
-            <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-          )}
-        </button>
-
-        {/* right: controls — doesn't toggle collapse */}
-        {!collapsed && (
-          <div className="flex items-center gap-1">
-            {availableModels.length > 0 && (
-              <select
-                className="text-xs bg-muted/50 text-muted-foreground border-none rounded px-1.5 py-1 outline-none cursor-pointer focus:ring-1 focus:ring-ring hover:bg-muted transition-colors max-w-[120px] truncate"
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                title="Select LLM Model"
-              >
-                {availableModels.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+    <div className="h-full flex flex-col bg-white text-gray-800 overflow-hidden relative border rounded-xl shadow-sm mx-1 my-1">
+      {/* HEADER SECTION - TABS MOCKUP STYLE */}
+      <div className="flex h-[56px] items-center justify-between px-3 border-b shrink-0 select-none z-20">
+        <div className="flex items-center gap-1">
+          {/* Chat Tab */}
+          <button 
+            onClick={() => setActiveTab("chat")}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all",
+              activeTab === "chat" ? "bg-purple-600 text-white shadow-md font-bold" : "text-gray-500 hover:bg-gray-100 font-medium"
             )}
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span className="text-sm">Chat</span>
+          </button>
+
+          {/* Live Tab */}
+          <button 
+            onClick={() => setActiveTab("live")}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all",
+              activeTab === "live" ? "bg-purple-600 text-white shadow-md font-bold" : "text-gray-500 hover:bg-gray-100 font-medium"
+            )}
+          >
+            <Mic className="w-4 h-4" />
+            <span className="text-sm">Live</span>
+          </button>
+        </div>
+
+        {!collapsed && (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+             {/* Model Selector - RESTORED */}
+             {availableModels.length > 0 && activeTab === "chat" && (
+                <select
+                  className="text-[10px] bg-white text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 outline-none cursor-pointer hover:border-blue-400 transition-colors max-w-[80px] truncate"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  title="Select LLM Model"
+                >
+                  {availableModels.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              )}
+
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                newSession();
-              }}
-              title="New chat session"
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors shrink-0"
+              onClick={newSession}
+              className="flex items-center gap-1.5 px-3 py-1 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-full text-[11px] font-bold transition-all shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
               New Chat
+            </button>
+            <button onClick={onToggle} className="p-1 hover:bg-gray-100 rounded lg:hidden">
+              <ChevronDown className="w-4 h-4 text-gray-400" />
             </button>
           </div>
         )}
       </div>
 
-      {/* ── everything below is hidden when collapsed ── */}
+      {/* BODY CONTENT - MUTUALLY EXCLUSIVE TABS */}
       {!collapsed && (
-        <>
-          {/* session history accordion */}
-          {sessionHistory.length > 0 && (
-            <div className="border-b shrink-0">
-              <button
-                onClick={() => setHistoryOpen((o) => !o)}
-                className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-muted/40 transition-colors"
-              >
-                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground flex-1">
-                  Past sessions ({sessionHistory.length})
-                </span>
-                {historyOpen ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                )}
-              </button>
-
-              {historyOpen && (
-                <div className="max-h-48 overflow-y-auto bg-gray-50/50">
-                  {sessionHistory.map((s) => (
-                    <SessionHistoryItem key={s.id} session={s} />
-                  ))}
-                </div>
-              )}
+        <div className="flex-1 flex flex-col min-h-0 relative bg-white">
+          {activeTab === "live" ? (
+            /* LIVE MODE VIEW - RENDER THE REAL COMPONENT */
+            <div className="flex-1 overflow-hidden">
+               <LiveAgent />
             </div>
-          )}
+          ) : (
+            /* CHAT MODE VIEW */
+            <>
+              {/* HISTORY ACCORDION */}
+              <div className="px-3 py-2">
+                <button
+                  onClick={() => setHistoryOpen((o) => !o)}
+                  className="w-full flex items-center gap-2 px-4 py-2 bg-gray-200/50 hover:bg-gray-200 rounded-xl transition-colors"
+                >
+                  <Clock className="w-4 h-4 text-gray-500" />
+                  <span className="text-xs text-gray-700 flex-1 font-semibold text-left">
+                    Past sessions
+                  </span>
+                  <ChevronRight className={cn("w-4 h-4 text-gray-400 transition-transform", historyOpen && "rotate-90")} />
+                </button>
+                {historyOpen && (
+                  <div className="mt-1 border border-gray-100 rounded-xl overflow-hidden shadow-inner">
+                    {sessionHistory.map((s) => (
+                      <SessionHistoryItem key={s.id} session={s} />
+                    ))}
+                  </div>
+                )}
+              </div>
 
-          {/* current messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center text-muted-foreground text-sm mt-8">
-                <p>Ask the agent to create a visualization.</p>
-                <p className="mt-2 text-xs">
-                  Try: "Show me a bar chart of sales by category"
+              {/* MESSAGES LIST */}
+              <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4">
+                {messages.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-300 opacity-50 py-10">
+                    <MessageCircle className="w-12 h-12" />
+                    <p className="text-sm font-medium">Start the conversation</p>
+                  </div>
+                )}
+                
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={cn("flex flex-col", msg.role === "user" ? "items-end" : "items-start")}
+                  >
+                    <div
+                      className={cn(
+                        "rounded-2xl px-4 py-2.5 text-[13px] max-w-[85%] w-fit shadow-sm",
+                        msg.role === "user"
+                          ? "bg-purple-600 text-white rounded-tr-sm"
+                          : "bg-gray-100 text-gray-800 rounded-tl-sm border border-gray-200",
+                      )}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                
+                {thinkingMessage && (
+                  <p className="text-[11px] text-gray-400 italic animate-pulse">
+                    loading text
+                  </p>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* INPUT AREA */}
+              <div className="p-4 bg-white border-t shrink-0">
+                <div className="relative flex items-center gap-2 bg-white border border-gray-300 rounded-[32px] px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-purple-600/20 focus-within:border-purple-600 transition-all">
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Message the agent..."
+                    disabled={isStreaming}
+                    rows={1}
+                    className="flex-1 min-h-[24px] max-h-[120px] resize-none bg-transparent py-1 text-sm outline-none placeholder:text-gray-400"
+                  />
+                  <div className="flex items-center gap-2">
+                    {isStreaming ? (
+                      <button
+                        onClick={stopStreaming}
+                        className="p-1 rounded-full text-purple-600 hover:bg-purple-50 transition-colors"
+                      >
+                        <StopCircle className="w-5 h-5" />
+                      </button>
+                    ) : (
+                      <button
+                        disabled={!input.trim()}
+                        onClick={handleSend}
+                        className="p-1 rounded-full text-purple-600 hover:bg-purple-50 active:scale-90 disabled:opacity-30 disabled:grayscale transition-all"
+                      >
+                        <Send className="w-6 h-6 rotate-45" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[9px] text-center text-gray-400 mt-2">
+                  Gemini can make mistakes. Check important info.
                 </p>
               </div>
-            )}
+            </>
+          )}
+        </div>
+      )}
 
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
-              >
-                <div
-                  className={cn(
-                    "rounded-lg px-3 py-2 text-sm max-w-[85%] w-fit",
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground",
-                  )}
-                >
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-
-            {thinkingMessage && (
-              <p className="text-xs text-muted-foreground italic animate-pulse">
-                {thinkingMessage}
-              </p>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* input row */}
-          <div className="border-t p-3 shrink-0">
-            <div className="flex items-end gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask the agent..."
-                disabled={isStreaming}
-                rows={1}
-                className="flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-              />
-
-              {isStreaming ? (
-                /* Stop button */
-                <button
-                  onClick={stopStreaming}
-                  title="Stop agent"
-                  className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-red-50 hover:bg-red-100 border border-red-200 transition-colors"
-                >
-                  <StopCircle className="w-4 h-4 text-red-500" />
-                </button>
-              ) : (
-                /* Send button */
-                <button
-                  onClick={handleSend}
-                  disabled={!input.trim()}
-                  title="Send"
-                  className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-4 h-4 text-primary-foreground" />
-                </button>
-              )}
-            </div>
-          </div>
-        </>
+      {/* Collapsed view toggle button */}
+      {collapsed && (
+        <button onClick={onToggle} className="flex-1 flex items-center justify-center hover:bg-gray-50 transition-colors py-4">
+          <ChevronRight className="w-5 h-5 text-gray-400" />
+        </button>
       )}
     </div>
   );

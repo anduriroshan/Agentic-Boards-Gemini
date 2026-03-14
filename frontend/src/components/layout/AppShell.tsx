@@ -11,7 +11,6 @@ import DashboardCanvas from "@/components/dashboard/DashboardCanvas";
 import AgentActivity from "@/components/activity/AgentActivity";
 import SessionsPanel from "@/components/sessions/SessionsPanel";
 import DataSourceSelector from "@/components/layout/DataSourceSelector";
-import LiveAgent from "@/components/chat/LiveAgent";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -162,7 +161,6 @@ export default function AppShell() {
           </div>
         </Panel>
       </PanelGroup>
-      <LiveAgent />
     </div>
   );
 }

@@ -239,6 +239,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         currentTiles,
         chatHistory,
         state.selectedModel,
+        useAgentStore.getState().activeConnection,
         controller.signal,
       );
     } catch (error) {

@@ -31,10 +31,18 @@ class DatabricksMetadataStore:
 
     def _get_client(self) -> MilvusClient:
         if self._client is None:
-            self._client = MilvusClient(
-                uri=settings.milvus_uri,
-                token=settings.milvus_token
-            )
+            import os
+            # Ensure path is absolute for Milvus Lite
+            uri = settings.milvus_uri
+            if not uri.startswith(("http://", "https://")):
+                uri = os.path.abspath(uri)
+                
+            logger.info(f"[Milvus] Connecting to: {uri}")
+            client_kwargs = {"uri": uri}
+            if settings.milvus_token:
+                client_kwargs["token"] = settings.milvus_token
+            
+            self._client = MilvusClient(**client_kwargs)
         return self._client
 
     def _ensure_collection(self) -> None:

@@ -127,7 +127,10 @@ def _build_system_message(state: AgentState) -> str:
     else:
         dashboard_section = "The dashboard is currently empty."
 
-    return REACT_SYSTEM_PROMPT.format(dashboard_context=dashboard_section)
+    provider = state.get("database_provider")
+    connection_flag = f"\n[ACTIVE CONNECTION: {provider.upper()}]\n" if provider else ""
+
+    return connection_flag + REACT_SYSTEM_PROMPT.format(dashboard_context=dashboard_section)
 
 
 def _needs_visualization_nudge(state_messages: list) -> bool:

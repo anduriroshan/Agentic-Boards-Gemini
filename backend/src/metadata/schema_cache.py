@@ -123,6 +123,7 @@ def _fetch_schema(catalog: str, schema: str) -> SchemaCacheEntry:
 
         entry[table_name] = {
             "table": table_name,
+            "type": "databricks",
             "cube": table_name.split(".")[-1],
             "columns": columns,
             "measures": measures,

@@ -142,6 +142,7 @@ class ChatRequest(BaseModel):
     llm_model: str | None = None
     current_tiles: list[dict] = []   # [{tile_id, title, vega_spec, layout}, ...]
     chat_history: list[dict] = []    # [{role, content}, ...]
+    database_provider: str | None = None
 
 
 # Hardcoded fallback spec for when the agent is not configured
@@ -507,6 +508,7 @@ async def _agent_event_generator(request: ChatRequest, http_request: HTTPRequest
                 "current_tiles": request.current_tiles,
                 "chat_history": request.chat_history,
                 "llm_model": request.llm_model,
+                "database_provider": request.database_provider,
                 "guardrail_result": None,
             }
 

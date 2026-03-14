@@ -80,6 +80,7 @@ def _get_fallback_metadata() -> list[dict]:
         entries.append({
             "cube": table.split(".")[-1],
             "table": table,
+            "type": "databricks",
             "measures": [],
             "dimensions": [],
             "description": f"Default Databricks table.",
@@ -201,6 +202,7 @@ def _hits_to_metadata(hits: list[dict]) -> list[dict]:
 
     tables: dict[str, dict] = defaultdict(lambda: {
         "table": "",
+        "type": "databricks",
         "columns": [],
         "measures": [],
         "dimensions": [],
@@ -260,6 +262,43 @@ class ExecuteSQLInput(BaseModel):
 class ExecuteBigQueryInput(BaseModel):
     """Input for the execute_bigquery tool."""
     sql: str = Field(description="A valid Google BigQuery SQL query (standard SQL). Use backticks for table names. Must include LIMIT unless doing aggregation.")
+
+
+class GetBigQuerySchemaInput(BaseModel):
+    """Input for the get_bigquery_schema tool."""
+    table_name: str = Field(description="The fully-qualified BigQuery table name (project.dataset.table).")
+
+
+@tool("get_bigquery_schema", args_schema=GetBigQuerySchemaInput)
+def get_bigquery_schema(table_name: str) -> str:
+    """Get the column definitions (schema) for a specific BigQuery table.
+    Use this if you know a table exists (e.g. from search_metadata) but don't know its columns.
+    """
+    from src.bigquery.client import get_bigquery_manager
+    bq = get_bigquery_manager()
+    
+    # Sanitize the table name - it might come in with backticks or dots
+    clean_table = table_name.strip("`")
+    parts = clean_table.split(".")
+    if len(parts) < 3:
+        return f"Error: '{table_name}' is not a fully-qualified BigQuery table name (project.dataset.table)."
+    
+    project_id, dataset_id, table_id = parts[0], parts[1], parts[2]
+    
+    # In BigQuery standard SQL, INFORMATION_SCHEMA is scoped to the dataset
+    sql = f"""
+    SELECT column_name, data_type 
+    FROM `{project_id}`.{dataset_id}.INFORMATION_SCHEMA.COLUMNS 
+    WHERE table_name = '{table_id}'
+    """
+    
+    try:
+        rows = bq.query(sql)
+        if not rows:
+            return f"No schema found for table '{table_name}'. Verify the table exists."
+        return _safe_json_dumps(rows, indent=2)
+    except Exception as e:
+        return f"Error fetching schema: {str(e)}"
 
 
 @tool("execute_bigquery", args_schema=ExecuteBigQueryInput)
@@ -426,6 +465,7 @@ class ModifyDashboardInput(BaseModel):
             '"spec_updates" (array of {tile_id, vega_spec}) to change chart appearance; '
             '"layout_updates" (array of {tile_id, x, y, w, h}) to reposition/resize on the 12-column grid; '
             '"title_updates" (array of {tile_id, title}) to rename the tile header label; '
+            '"kpi_updates" (array of {tile_id, value, subtitle, color}) to modify metric cards; '
             '"text_updates" (array of {tile_id, markdown}) to update the content of a text/markdown tile. '
             'Each row ≈ 100px. w goes from 1–12 (12=full width).'
         )
@@ -458,13 +498,15 @@ def modify_dashboard(modifications: str) -> str:
     spec_updates = mods.get("spec_updates", [])
     layout_updates = mods.get("layout_updates", [])
     title_updates = mods.get("title_updates", [])
+    kpi_updates = mods.get("kpi_updates", [])
     text_updates = mods.get("text_updates", [])
 
     if spec_updates:
         # Normalise each spec_update: parse vega_spec if the LLM sent it as a
         # JSON string instead of an object, and inject $schema if missing.
+        valid_spec_updates = [su for su in spec_updates if isinstance(su, dict)]
         normalised_spec_updates = []
-        for su in spec_updates:
+        for su in valid_spec_updates:
             vs = su.get("vega_spec")
             if isinstance(vs, str):
                 try:
@@ -474,35 +516,52 @@ def modify_dashboard(modifications: str) -> str:
             if isinstance(vs, dict) and "$schema" not in vs:
                 vs["$schema"] = "https://vega.github.io/schema/vega-lite/v5.json"
             normalised_spec_updates.append({**su, "vega_spec": vs})
-        result["spec_updates"] = normalised_spec_updates
-        logger.info(
-            "[TOOL:modify_dashboard] spec updates for tile(s): %s",
-            [u.get("tile_id") for u in normalised_spec_updates],
-        )
+        
+        if normalised_spec_updates:
+            result["spec_updates"] = normalised_spec_updates
+            logger.info(
+                "[TOOL:modify_dashboard] spec updates for tile(s): %s",
+                [u.get("tile_id") for u in normalised_spec_updates],
+            )
 
     if layout_updates:
-        result["layout_updates"] = layout_updates
-        logger.info(
-            "[TOOL:modify_dashboard] layout updates for tile(s): %s",
-            [u.get("tile_id") for u in layout_updates],
-        )
+        valid_layout_updates = [u for u in layout_updates if isinstance(u, dict)]
+        if valid_layout_updates:
+            result["layout_updates"] = valid_layout_updates
+            logger.info(
+                "[TOOL:modify_dashboard] layout updates for tile(s): %s",
+                [u.get("tile_id") for u in valid_layout_updates],
+            )
 
     if title_updates:
-        result["title_updates"] = title_updates
-        logger.info(
-            "[TOOL:modify_dashboard] title updates for tile(s): %s",
-            [u.get("tile_id") for u in title_updates],
-        )
+        valid_title_updates = [u for u in title_updates if isinstance(u, dict)]
+        if valid_title_updates:
+            result["title_updates"] = valid_title_updates
+            logger.info(
+                "[TOOL:modify_dashboard] title updates for tile(s): %s",
+                [u.get("tile_id") for u in valid_title_updates],
+            )
+
+    if kpi_updates:
+        valid_kpi_updates = [u for u in kpi_updates if isinstance(u, dict)]
+        if valid_kpi_updates:
+            result["kpi_updates"] = valid_kpi_updates
+            logger.info(
+                "[TOOL:modify_dashboard] kpi updates for tile(s): %s",
+                [u.get("tile_id") for u in valid_kpi_updates],
+            )
 
     if text_updates:
-        result["text_updates"] = text_updates
-        logger.info(
-            "[TOOL:modify_dashboard] text updates for tile(s): %s",
-            [u.get("tile_id") for u in text_updates],
-        )
+        valid_text_updates = [u for u in text_updates if isinstance(u, dict)]
+        if valid_text_updates:
+            result["text_updates"] = valid_text_updates
+            logger.info(
+                "[TOOL:modify_dashboard] text updates for tile(s): %s",
+                [u.get("tile_id") for u in valid_text_updates],
+            )
 
-    if not spec_updates and not layout_updates and not title_updates and not text_updates:
-        result["error"] = "No spec_updates, layout_updates, title_updates, or text_updates provided."
+    if not spec_updates and not layout_updates and not title_updates and not kpi_updates and not text_updates:
+        result["error"] = "No spec_updates, layout_updates, title_updates, kpi_updates, or text_updates provided."
 
     return json.dumps(result)
 

@@ -20,5 +20,6 @@ class AgentState(TypedDict):
     current_tiles: list[dict]   # [{tile_id, title, vega_spec, layout}, ...]
     chat_history: list[dict]    # [{role, content}, ...]
     llm_model: str | None       # Optional specific model to use for this request
+    database_provider: str | None # Active database connection (e.g. "databricks", "bigquery")
     guardrail_result: dict | None # {"classification": "IN_SCOPE" | "OUT_OF_SCOPE", "reason": str}
 

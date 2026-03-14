@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useDashboardStore } from "@/stores/dashboardStore";
 import { useFilterStore } from "@/stores/filterStore";
 import { refreshChartData } from "@/lib/api";
@@ -46,6 +46,8 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
   const [autoRefreshMs, setAutoRefreshMs] = useState(0);
 
   const filters = useFilterStore((s) => s.filters);
+  const lastFiltersRef = useRef(filters);
+  const isInitialMount = useRef(true);
 
   const hasQueryMeta = !!tile.queryMeta?.sql;
   const params = tile.queryMeta?.params || {};
@@ -60,11 +62,13 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
           tile.queryMeta.sql,
           { ...(paramOverrides || {}), type: tile.queryMeta.type },
         );
-        if (!result.error && result.rows && result.rows.length > 0) {
+        if (!result.error && result.rows) {
+          // Update the last applied filters filter state
+          lastFiltersRef.current = filters;
+          
           if (tile.type === "chart" && tile.vegaSpec) {
             updateTile(tile.id, updateVegaData(tile.vegaSpec, result.rows));
           } else if (tile.type === "table") {
-            // Rebuild column definitions from the new data
             const firstRow = result.rows[0];
             const columns = firstRow
               ? Object.keys(firstRow).map((field) => ({
@@ -93,6 +97,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
       tile.queryMeta,
       tile.vegaSpec,
       tile.type,
+      filters,
       updateTile,
       updateTableTile,
       updateTileQueryMeta,
@@ -109,14 +114,31 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
   // React to global filter changes
   useEffect(() => {
     if (!hasQueryMeta) return;
+
+    // Optimization: Skip refresh on mount if we already have data 
+    // AND filters are at their default state (empty/null)
+    const hasData = tile.type === 'chart' ? !!(tile.vegaSpec?.data as any)?.values : !!tile.tableData?.rows;
+    const filtersChanged = JSON.stringify(filters) !== JSON.stringify(lastFiltersRef.current);
+    
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      // Optimization: Skip initial refresh if we already have data
+      if (hasData) {
+        lastFiltersRef.current = filters;
+        return;
+      }
+      // If no data, we fall through to perform the initial fetch
+    } else if (!filtersChanged) {
+      // Periodic check: Only refresh if filters actually changed
+      return;
+    }
+
     const overrides: Record<string, unknown> = {};
     if (filters.dateFrom) overrides.date_from = filters.dateFrom;
     if (filters.dateTo) overrides.date_to = filters.dateTo;
 
-    // Pass merged parameters
     handleRefresh(overrides);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, hasQueryMeta]);
+  }, [filters, hasQueryMeta, handleRefresh]);
 
   return (
     <div

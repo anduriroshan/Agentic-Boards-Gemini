@@ -51,6 +51,7 @@ export async function sendChatMessage(
   currentTiles?: TileContext[],
   chatHistory?: ChatHistoryItem[],
   llmModel?: string | null,
+  databaseProvider?: string,
   signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch(`${API_BASE}/chat`, {
@@ -62,6 +63,7 @@ export async function sendChatMessage(
       llm_model: llmModel,
       current_tiles: currentTiles ?? [],
       chat_history: chatHistory ?? [],
+      database_provider: databaseProvider,
     }),
     signal,
   });
