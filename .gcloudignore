@@ -1,0 +1,9 @@
+# Keep the Cloud Build upload predictable and aligned with .gitignore,
+# but explicitly include frontend runtime helper modules under src/lib.
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore
+
+!frontend/src/lib/
+!frontend/src/lib/**

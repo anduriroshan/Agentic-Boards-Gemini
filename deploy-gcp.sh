@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Configuration
 # Default values if environment variables are not set
@@ -11,7 +12,7 @@ echo "📝 Parsing environment variables from backend/.env..."
 ENV_VARS=$(grep -v '^#' backend/.env | grep -v '^$' | grep '=' | sed 's/"//g' | sed "s/'//g" | paste -sd "," -)
 
 # Load specifically for script use (Cloudflare/Domain)
-source <(grep -E '^(CLOUDFLARE|DOMAIN_NAME)' backend/.env | sed 's/"//g' | sed "s/'//g")
+source <(grep -E '^(CLOUDFLARE|DOMAIN_NAME)' backend/.env | sed 's/"//g' | sed "s/'//g" || true)
 
 # 2. Ensure Artifact Registry exists
 REPO_NAME="app-repo"
@@ -29,7 +30,7 @@ gcloud storage buckets create gs://${BUCKET_NAME} --location=${GCP_REGION} 2>/de
 # 4. Build and Deploy in one step using --source
 echo "🚀 Building and deploying to Cloud Run (this handles containerization)..."
 # Extract custom service account if provided in .env
-CUSTOM_SA=$(grep '^GCP_SERVICE_ACCOUNT=' backend/.env | cut -d '=' -f 2)
+CUSTOM_SA=$(grep '^GCP_SERVICE_ACCOUNT=' backend/.env | cut -d '=' -f 2 || true)
 SA_FLAG=""
 if [ -n "$CUSTOM_SA" ]; then
     SA_FLAG="--service-account=${CUSTOM_SA}"
@@ -50,7 +51,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --set-env-vars="${ENV_VARS}"
 
 # 5. DNS Automation (Optional)
-if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$DOMAIN_NAME" ] && [ -n "$CLOUDFLARE_ZONE_ID" ]; then
+if [ -n "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${DOMAIN_NAME:-}" ] && [ -n "${CLOUDFLARE_ZONE_ID:-}" ]; then
     echo "🌐 Automating DNS for ${DOMAIN_NAME}..."
     
     # Create domain mapping if it doesn't exist
