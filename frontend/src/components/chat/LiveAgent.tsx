@@ -23,8 +23,9 @@ const LiveAgent: React.FC = () => {
   const { startRun, upsertStep, finishRun } = useAgentStore();
   const currentRunId = useRef<string | null>(null);
   const isActiveRef = useRef(false);
-  const isAgentProcessingRef = useRef(false); // true while audio is playing/queued
-  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null); // for interruption
+  const isAgentProcessingRef = useRef(false);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const playbackGenerationRef = useRef(0); // monotonic counter — incremented on each interrupt
 
   const toggleLive = () => {
     if (isActive) {
@@ -320,15 +321,14 @@ const LiveAgent: React.FC = () => {
   };
 
   const interruptAudio = () => {
-    // Stop the currently playing source immediately
+    playbackGenerationRef.current++; // invalidates any currently running processQueue loop
     if (currentSourceRef.current) {
       try {
-        currentSourceRef.current.onended = null; // prevent resolve racing
+        currentSourceRef.current.onended = null;
         currentSourceRef.current.stop();
       } catch (_) { /* already stopped */ }
       currentSourceRef.current = null;
     }
-    // Drain the queue so stale audio doesn't play
     audioQueue.current = [];
     isQueueProcessing.current = false;
     setIsSpeaking(false);
@@ -336,10 +336,14 @@ const LiveAgent: React.FC = () => {
 
   const processQueue = async () => {
     if (isQueueProcessing.current || audioQueue.current.length === 0) return;
-    
     isQueueProcessing.current = true;
     
+    // Capture the generation at start — if it changes, this loop is stale and must exit
+    const myGeneration = playbackGenerationRef.current;
+    
     while (audioQueue.current.length > 0) {
+      if (playbackGenerationRef.current !== myGeneration) break; // interrupted — exit
+      
       const audioBuffer = audioQueue.current.shift();
       if (!audioBuffer || !outputAudioContextRef.current) continue;
 
@@ -351,16 +355,21 @@ const LiveAgent: React.FC = () => {
       
       await new Promise<void>((resolve) => {
         source.onended = () => {
-          currentSourceRef.current = null;
-          setIsSpeaking(false);
+          if (playbackGenerationRef.current === myGeneration) {
+            currentSourceRef.current = null;
+            setIsSpeaking(false);
+          }
           resolve();
         };
         source.start();
       });
     }
     
-    isQueueProcessing.current = false;
-    isAgentProcessingRef.current = false; // done speaking — context updates OK again
+    // Only update state if this loop is still the current one
+    if (playbackGenerationRef.current === myGeneration) {
+      isQueueProcessing.current = false;
+      isAgentProcessingRef.current = false;
+    }
   };
 
   const createWavHeader = (dataLength: number, sampleRate: number) => {

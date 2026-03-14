@@ -80,6 +80,8 @@ async def websocket_endpoint(websocket: WebSocket):
     )
     
     stop_upstream = asyncio.Event()
+    # Shared state: tracks when the model last produced audio, used to gate context_updates
+    generation_state = {"last_audio_ts": 0.0}
 
     async def upstream():
         try:
@@ -101,6 +103,12 @@ async def websocket_endpoint(websocket: WebSocket):
                             logger.info(f"[WS] Received text message: {msg_type}, payload snippet: {str(data)[:100]}...")
                             
                             if msg_type == "context_update":
+                                # Suppress if the model sent audio in the last 4s — injecting a new
+                                # user turn mid-response creates a second voice stream.
+                                since_last_audio = time.time() - generation_state["last_audio_ts"]
+                                if since_last_audio < 4.0:
+                                    logger.info(f"[WS] Suppressed context_update — model active ({since_last_audio:.1f}s ago)")
+                                    continue
                                 tiles = data.get("tiles", [])
                                 provider = data.get("database_provider", "databricks")
                                 
@@ -159,6 +167,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if event.content and event.content.parts:
                     for part in event.content.parts:
                         if part.inline_data and part.inline_data.data:
+                            generation_state["last_audio_ts"] = time.time()  # model is speaking
                             await websocket.send_bytes(part.inline_data.data)
                         elif part.thought:
                             # Move thinking to Agent Activity panel
