@@ -26,9 +26,22 @@ function formatValue(raw: string): string {
 }
 
 export default function KpiTile({ title, kpiData }: KpiTileProps) {
-    const { value, subtitle, color, sparkline } = kpiData;
+    const { value, subtitle, color, sparkline, fontSize } = kpiData;
     const displayValue = formatValue(value);
     const valueColor = color || "#1e40af"; // default deep-blue
+    const size = fontSize || "md";
+    const valueFontSize =
+        size === "sm"
+            ? "clamp(1.2rem, 3vw, 2.1rem)"
+            : size === "lg"
+                ? "clamp(2rem, 5vw, 3.2rem)"
+                : size === "xl"
+                    ? "clamp(2.3rem, 5.6vw, 3.8rem)"
+                    : "clamp(1.6rem, 4vw, 2.8rem)";
+    const labelFontSize =
+        size === "sm" ? "0.62rem" : size === "lg" ? "0.84rem" : size === "xl" ? "0.96rem" : "0.72rem";
+    const subtitleFontSize =
+        size === "sm" ? "0.62rem" : size === "lg" ? "0.82rem" : size === "xl" ? "0.9rem" : "0.7rem";
 
     // Calculate sparkline path if data exists
     let sparklinePath = "";
@@ -76,7 +89,7 @@ export default function KpiTile({ title, kpiData }: KpiTileProps) {
             {/* Label (top, small) */}
             <span
                 style={{
-                    fontSize: "0.72rem",
+                    fontSize: labelFontSize,
                     fontWeight: 600,
                     letterSpacing: "0.07em",
                     textTransform: "uppercase",
@@ -90,7 +103,7 @@ export default function KpiTile({ title, kpiData }: KpiTileProps) {
             {/* Value (centre, large) */}
             <span
                 style={{
-                    fontSize: "clamp(1.6rem, 4vw, 2.8rem)",
+                    fontSize: valueFontSize,
                     fontWeight: 800,
                     color: valueColor,
                     lineHeight: 1.1,
@@ -123,7 +136,7 @@ export default function KpiTile({ title, kpiData }: KpiTileProps) {
             {subtitle && (
                 <span
                     style={{
-                        fontSize: "0.7rem",
+                        fontSize: subtitleFontSize,
                         color: "#94a3b8",
                         lineHeight: 1.3,
                         maxWidth: "90%",

@@ -440,16 +440,16 @@ def _process_graph_event(
                 elapsed_ms=elapsed,
             ))
             tool_events = list(_parse_tool_result(tool_name, content))
-            # Inject query_meta into visualization / data_table events for live chart support
+            # Inject query_meta into visualization / data_table / kpi events for refresh support
             if (
                 stream_ctx is not None
-                and tool_name in ("create_visualization", "create_data_table")
+                and tool_name in ("create_visualization", "create_data_table", "create_kpi_tile")
                 and stream_ctx.get("last_sql")
             ):
                 from src.api.routes_charts import detect_sql_params
 
                 for evt in tool_events:
-                    if evt.get("event") in ("visualization", "data_table"):
+                    if evt.get("event") in ("visualization", "data_table", "kpi_tile"):
                         try:
                             evt_data = json.loads(evt["data"])
                             evt_data["query_meta"] = {

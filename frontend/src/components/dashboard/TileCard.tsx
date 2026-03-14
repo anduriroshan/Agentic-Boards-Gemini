@@ -9,6 +9,7 @@ import TextTile from "./TextTile";
 import TileComments from "./TileComments";
 import ChartControls from "./ChartControls";
 import TextTileControls from "./TextTileControls";
+import KpiTileControls from "./KpiTileControls";
 import type { DashboardTile } from "@/types/dashboard";
 import type { TopLevelSpec } from "vega-lite";
 
@@ -33,6 +34,7 @@ function updateVegaData(
 }
 
 export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCardProps) {
+  const addKpiTile = useDashboardStore((s) => s.addKpiTile);
   const updateTile = useDashboardStore((s) => s.updateTile);
   const updateTableTile = useDashboardStore((s) => s.updateTableTile);
   const updateTextTile = useDashboardStore((s) => s.updateTextTile);
@@ -43,6 +45,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
   const [showParams, setShowParams] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showTextSettings, setShowTextSettings] = useState(false);
+  const [showKpiSettings, setShowKpiSettings] = useState(false);
   const [autoRefreshMs, setAutoRefreshMs] = useState(0);
 
   const filters = useFilterStore((s) => s.filters);
@@ -52,6 +55,15 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
   const hasQueryMeta = !!tile.queryMeta?.sql;
   const params = tile.queryMeta?.params || {};
   const hasParams = Object.keys(params).length > 0;
+
+  const asNumber = (v: unknown): number | null => {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string") {
+      const n = Number(v.replace(/,/g, "").replace(/[$%]/g, ""));
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  };
 
   const handleRefresh = useCallback(
     async (paramOverrides?: Record<string, unknown>) => {
@@ -77,6 +89,49 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
               }))
               : [];
             updateTableTile(tile.id, { columns, rows: result.rows });
+          } else if (tile.type === "kpi" && tile.kpiData) {
+            const firstRow = result.rows[0] as Record<string, unknown> | undefined;
+            if (firstRow && typeof firstRow === "object") {
+              const entries = Object.entries(firstRow);
+              const numericEntry = entries.find(([, val]) => asNumber(val) !== null);
+              const valueEntry = numericEntry || entries.find(([, val]) => val !== null && val !== undefined);
+
+              let value = tile.kpiData.value;
+              if (valueEntry) {
+                const raw = valueEntry[1];
+                if (typeof raw === "number") {
+                  const hasDollarPrefix = tile.kpiData.value.trim().startsWith("$");
+                  value = hasDollarPrefix ? `$${raw.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : raw.toLocaleString("en-US");
+                } else if (raw !== null && raw !== undefined) {
+                  value = String(raw);
+                }
+              }
+
+              let subtitle = tile.kpiData.subtitle;
+              const minDate = firstRow.min_date || firstRow.minDate;
+              const maxDate = firstRow.max_date || firstRow.maxDate;
+              if (minDate && maxDate) {
+                subtitle = `Data from ${minDate} to ${maxDate}`;
+              }
+
+              let sparkline = tile.kpiData.sparkline;
+              const numericRows = result.rows
+                .map((row: Record<string, unknown>) => {
+                  if (!numericEntry) return null;
+                  return asNumber(row[numericEntry[0]]);
+                })
+                .filter((n): n is number => n !== null);
+              if (numericRows.length > 1) {
+                sparkline = numericRows;
+              }
+
+              addKpiTile(
+                tile.id,
+                { ...tile.kpiData, value, subtitle, sparkline },
+                tile.title,
+                tile.queryMeta,
+              );
+            }
           }
           if (result.params) {
             updateTileQueryMeta(tile.id, {
@@ -100,6 +155,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
       filters,
       updateTile,
       updateTableTile,
+      addKpiTile,
       updateTileQueryMeta,
     ],
   );
@@ -117,7 +173,14 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
 
     // Optimization: Skip refresh on mount if we already have data 
     // AND filters are at their default state (empty/null)
-    const hasData = tile.type === 'chart' ? !!(tile.vegaSpec?.data as any)?.values : !!tile.tableData?.rows;
+    const hasData =
+      tile.type === "chart"
+        ? !!(tile.vegaSpec?.data as any)?.values
+        : tile.type === "table"
+          ? !!tile.tableData?.rows
+          : tile.type === "kpi"
+            ? !!tile.kpiData?.value
+            : false;
     const filtersChanged = JSON.stringify(filters) !== JSON.stringify(lastFiltersRef.current);
     
     if (isInitialMount.current) {
@@ -225,6 +288,19 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
               >
                 ↻
               </button>
+              {tile.type === "kpi" && (
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowKpiSettings(!showKpiSettings);
+                  }}
+                  className={`text-sm px-1 transition-colors ${showKpiSettings ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  title="KPI Text Size"
+                >
+                  A
+                </button>
+              )}
             </>
           )}
           {autoRefreshMs > 0 && (
@@ -287,6 +363,20 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
         <TextTileControls
           currentFontSize={tile.textData.fontSize}
           onApply={(fontSize) => updateTextTile(tile.id, tile.textData!.markdown, fontSize)}
+        />
+      )}
+
+      {/* ── KPI Settings Panel (collapsible) ───────────────────── */}
+      {showKpiSettings && tile.type === "kpi" && tile.kpiData && (
+        <KpiTileControls
+          currentFontSize={tile.kpiData.fontSize}
+          onApply={(fontSize) =>
+            addKpiTile(
+              tile.id,
+              { ...tile.kpiData!, fontSize },
+              tile.title,
+              tile.queryMeta,
+            )}
         />
       )}
 

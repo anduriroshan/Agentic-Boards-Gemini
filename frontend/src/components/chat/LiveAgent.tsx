@@ -724,6 +724,7 @@ const LiveAgent: React.FC = () => {
             sparkline: args.sparkline_data ? tryParse(args.sparkline_data) : undefined,
           },
           args.title || "KPI",
+          queryMeta,
         );
         markToolMutation();
         break;
@@ -809,6 +810,8 @@ const LiveAgent: React.FC = () => {
               value: u.value ?? existingKpi?.value ?? "",
               subtitle: u.subtitle ?? existingKpi?.subtitle ?? "",
               color: u.color ?? existingKpi?.color ?? "",
+              sparkline: existingKpi?.sparkline,
+              fontSize: existingKpi?.fontSize,
             },
             "",
           );

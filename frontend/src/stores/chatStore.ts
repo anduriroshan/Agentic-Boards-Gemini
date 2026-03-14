@@ -35,7 +35,7 @@ interface ChatState {
   removeTileCallback: ((data: { tile_id: string }) => void) | null;
   updateTileTitleCallback: ((data: { tile_id: string; title: string }) => void) | null;
   updateTextCallback: ((data: { tile_id: string; markdown: string }) => void) | null;
-  kpiTileCallback: ((data: { tile_id: string; title: string; value: string; subtitle: string; color: string; sparkline?: number[] }) => void) | null;
+  kpiTileCallback: ((data: { tile_id: string; title: string; value: string; subtitle: string; color: string; sparkline?: number[]; query_meta?: { sql: string; params: Record<string, unknown>; type?: "bigquery" | "databricks" } }) => void) | null;
   textTileCallback: ((data: { tile_id: string; title: string; markdown: string }) => void) | null;
   getTilesCallback: (() => { tile_id: string; title: string; type?: string; vega_spec: Record<string, unknown>; layout?: { x: number; y: number; w: number; h: number } }[]) | null;
   setVisualizationCallback: (cb: (data: { vega_spec: Record<string, unknown>; tile_id: string; query_meta?: { sql: string; params: Record<string, unknown> } }) => void) => void;
@@ -46,7 +46,7 @@ interface ChatState {
   setRemoveTileCallback: (cb: (data: { tile_id: string }) => void) => void;
   setUpdateTileTitleCallback: (cb: (data: { tile_id: string; title: string }) => void) => void;
   setUpdateTextCallback: (cb: (data: { tile_id: string; markdown: string }) => void) => void;
-  setKpiTileCallback: (cb: (data: { tile_id: string; title: string; value: string; subtitle: string; color: string; sparkline?: number[] }) => void) => void;
+  setKpiTileCallback: (cb: (data: { tile_id: string; title: string; value: string; subtitle: string; color: string; sparkline?: number[]; query_meta?: { sql: string; params: Record<string, unknown>; type?: "bigquery" | "databricks" } }) => void) => void;
   setTextTileCallback: (cb: (data: { tile_id: string; title: string; markdown: string }) => void) => void;
   setGetTilesCallback: (cb: () => { tile_id: string; title: string; type?: string; vega_spec: Record<string, unknown>; layout?: { x: number; y: number; w: number; h: number } }[]) => void;
 }

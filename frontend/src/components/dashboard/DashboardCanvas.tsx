@@ -71,12 +71,13 @@ export default function DashboardCanvas() {
 
     // Add new KPI metric tile
     setKpiTileCallback((data) => {
+      const queryMeta = data.query_meta as QueryMeta | undefined;
       addKpiTile(data.tile_id, {
         value: data.value,
         subtitle: data.subtitle,
         color: data.color,
         sparkline: data.sparkline,
-      }, data.title);
+      }, data.title, queryMeta);
     });
 
     // Add Text/Markdown tile

@@ -6,7 +6,7 @@ interface DashboardState {
   tiles: DashboardTile[];
   addTile: (tileId: string, spec: import("vega-lite").TopLevelSpec, title?: string, queryMeta?: import("@/types/dashboard").QueryMeta) => void;
   addTableTile: (tileId: string, tableData: import("@/types/dashboard").TableData, title?: string, queryMeta?: import("@/types/dashboard").QueryMeta) => void;
-  addKpiTile: (tileId: string, kpiData: import("@/types/dashboard").KpiData, title: string) => void;
+  addKpiTile: (tileId: string, kpiData: import("@/types/dashboard").KpiData, title: string, queryMeta?: import("@/types/dashboard").QueryMeta) => void;
   addTextTile: (tileId: string, markdown: string, title?: string, fontSize?: string) => void;
   updateTile: (tileId: string, spec: TopLevelSpec) => void;
   updateTableTile: (tileId: string, tableData: TableData, title?: string) => void;
@@ -98,13 +98,13 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     });
   },
 
-  addKpiTile: (tileId, kpiData, title) => {
+  addKpiTile: (tileId, kpiData, title, queryMeta) => {
     set((state) => {
       const existing = state.tiles.find((t) => t.id === tileId);
       if (existing) {
         return {
           tiles: state.tiles.map((t) =>
-            t.id === tileId ? { ...t, type: "kpi", kpiData, title: title || t.title } : t
+            t.id === tileId ? { ...t, type: "kpi", kpiData, title: title || t.title, ...(queryMeta ? { queryMeta } : {}) } : t
           ),
         };
       }
@@ -115,6 +115,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         title: title || "Key Metric",
         type: "kpi",
         kpiData,
+        queryMeta,
         layout: { i: tileId, x, y, w: 24, h: 16 }, // Compact layout for KPIs
       };
       return { tiles: [...state.tiles, tile] };

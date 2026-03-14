@@ -12,6 +12,7 @@ export interface KpiData {
   subtitle: string;
   color: string;
   sparkline?: number[];
+  fontSize?: string;
 }
 
 export interface TableData {
