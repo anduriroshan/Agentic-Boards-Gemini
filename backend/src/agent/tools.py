@@ -64,7 +64,52 @@ _STATIC_FALLBACK = [
 ]
 
 
-def _get_fallback_metadata() -> list[dict]:
+def _get_provider_hint() -> str | None:
+    """Best-effort provider hint from live-session dashboard snapshot."""
+    try:
+        from src.api.routes_live import get_dashboard_snapshot
+
+        snapshot = get_dashboard_snapshot() or {}
+        provider = str(snapshot.get("database_provider", "")).strip().lower()
+        if provider in {"bigquery", "databricks"}:
+            return provider
+    except Exception:
+        pass
+    return None
+
+
+def _matches_provider(entry: dict[str, Any], provider: str) -> bool:
+    entry_type = str(entry.get("type", "")).lower()
+    table = str(entry.get("table", "")).strip().lower()
+
+    if provider == "bigquery":
+        if entry_type == "bigquery":
+            return True
+        # Databricks public datasets are not BigQuery tables in this app flow.
+        if "databricks-datasets" in table or "databricks_datasets" in table:
+            return False
+        # Heuristic: project.dataset.table (contains at least 2 dots)
+        if table.count(".") >= 2 and "-" in table.split(".", 1)[0]:
+            return True
+        return False
+
+    if provider == "databricks":
+        if entry_type == "databricks":
+            return True
+        if "databricks-datasets" in table or "databricks_datasets" in table:
+            return True
+        return False
+
+    return True
+
+
+def _filter_results_by_provider(results: list[dict[str, Any]], provider: str | None) -> list[dict[str, Any]]:
+    if provider not in {"bigquery", "databricks"}:
+        return results
+    return [r for r in results if _matches_provider(r, provider)]
+
+
+def _get_fallback_metadata(provider_hint: str | None = None) -> list[dict]:
     """Return fallback metadata using the currently configured default table."""
     try:
         from src.databricks.client import get_databricks_manager
@@ -76,7 +121,7 @@ def _get_fallback_metadata() -> list[dict]:
         return _STATIC_FALLBACK
 
     entries = []
-    if table:
+    if table and provider_hint != "bigquery":
         entries.append({
             "cube": table.split(".")[-1],
             "table": table,
@@ -87,7 +132,7 @@ def _get_fallback_metadata() -> list[dict]:
         })
     
     from src.config import settings
-    if settings.bigquery_default_table:
+    if settings.bigquery_default_table and provider_hint != "databricks":
         bq_table = settings.bigquery_default_table
         entries.append({
             "cube": bq_table.split(".")[-1],
@@ -96,7 +141,7 @@ def _get_fallback_metadata() -> list[dict]:
             "description": "Default BigQuery table. Use execute_bigquery tool for this.",
         })
 
-    if catalog and schema:
+    if catalog and schema and provider_hint != "bigquery":
         entries.append({
             "hint": f"Browse all tables: SELECT * FROM information_schema.tables WHERE table_catalog='{catalog}' AND table_schema='{schema}'",
             "or_sql": f"SHOW TABLES IN {catalog}.{schema}",
@@ -234,7 +279,9 @@ def search_metadata(query: str) -> str:
     from src.bigquery.client import get_bigquery_manager
     from src.metadata import schema_cache
 
+    provider_hint = _get_provider_hint()
     results = []
+    logger.info("[TOOL:search_metadata] provider_hint=%s", provider_hint or "none")
 
     # 1. Try Milvus Vector Search (Cross-provider)
     if settings.milvus_enabled:
@@ -251,7 +298,7 @@ def search_metadata(query: str) -> str:
 
     # 2. Check BigQuery Default Table
     bq = get_bigquery_manager()
-    if bq.default_table and query.lower() in bq.default_table.lower():
+    if bq.default_table and (provider_hint == "bigquery" or query.lower() in bq.default_table.lower()):
         results.append({
             "cube": bq.default_table.split(".")[-1],
             "table": bq.default_table,
@@ -261,7 +308,7 @@ def search_metadata(query: str) -> str:
 
     # 3. Check Databricks Cache (if connected)
     dm = get_databricks_manager()
-    if dm.is_connected:
+    if dm.is_connected and provider_hint != "bigquery":
         try:
             cache_hits = schema_cache.search(
                 query=query,
@@ -276,6 +323,7 @@ def search_metadata(query: str) -> str:
     
     # 4. Filter and return
     if results:
+        results = _filter_results_by_provider(results, provider_hint)
         # De-duplicate by table name
         seen = set()
         unique_results = []
@@ -284,11 +332,12 @@ def search_metadata(query: str) -> str:
             if t and t not in seen:
                 unique_results.append(r)
                 seen.add(t)
-        return json.dumps(unique_results, indent=2)
+        if unique_results:
+            return json.dumps(unique_results, indent=2)
 
     # 5. Last resort: Static fallback
     logger.info("[TOOL:search_metadata] No dynamic hits — using static fallback")
-    return json.dumps(_get_fallback_metadata(), indent=2)
+    return json.dumps(_get_fallback_metadata(provider_hint), indent=2)
 
 
 def _hits_to_metadata(hits: list[dict]) -> list[dict]:
@@ -405,6 +454,19 @@ def execute_bigquery(sql: str) -> str:
     """
     from src.bigquery.client import get_bigquery_manager
     bq = get_bigquery_manager()
+
+    # Guard against cross-provider table confusion in live mode.
+    lowered_sql = sql.lower()
+    if "databricks-datasets" in lowered_sql or "databricks_datasets" in lowered_sql:
+        return _safe_json_dumps(
+            {
+                "error": (
+                    "SQL references a Databricks dataset/table while execute_bigquery is selected. "
+                    "Use a BigQuery table (project.dataset.table) for execute_bigquery."
+                ),
+                "rows": [],
+            }
+        )
     
     try:
         logger.info("[TOOL:execute_bigquery] %s", sql[:200])
@@ -656,6 +718,9 @@ def modify_dashboard(modifications: str | dict[str, Any] | list[Any]) -> str:
                             if tile_id and "tile_id" not in title_upd:
                                 title_upd["tile_id"] = tile_id
                             bucketed["title_updates"].append(title_upd)
+                        elif isinstance(title_val, str):
+                            if tile_id:
+                                bucketed["title_updates"].append({"tile_id": tile_id, "title": title_val})
                         continue
 
                     if "kpi_updates" in item:

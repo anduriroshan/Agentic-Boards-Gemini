@@ -20,6 +20,7 @@ from src.api.live_session_state import LiveSessionCoordinator, TurnLifecycleStat
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+INJECT_CONTEXT_UPDATES_INTO_MODEL = False
 
 class NormalClosureFilter(logging.Filter):
     """Suppresses misleading 1000 None APIErrors from ADK/GenAI during clean closure."""
@@ -38,11 +39,27 @@ adk_logger.addFilter(NormalClosureFilter())
 _session_activity_log: ContextVar[list[str]] = ContextVar("_session_activity_log", default=[])
 _current_websocket: ContextVar[WebSocket | None] = ContextVar("_current_websocket", default=None)
 _current_step_id: ContextVar[str | None] = ContextVar("_current_step_id", default=None)
+_dashboard_snapshot: ContextVar[dict[str, Any]] = ContextVar(
+    "_dashboard_snapshot",
+    default={"tiles": [], "database_provider": "unknown"},
+)
+_latest_dashboard_snapshot: dict[str, Any] = {"tiles": [], "database_provider": "unknown"}
 
 
 def get_session_activity() -> list[str]:
     """Helper for the get_recent_activity tool to access current session history."""
     return _session_activity_log.get()
+
+
+def get_dashboard_snapshot() -> dict[str, Any]:
+    """Helper for tools to read the latest dashboard context from live session messages."""
+    snapshot = _dashboard_snapshot.get()
+    if isinstance(snapshot, dict):
+        tiles = snapshot.get("tiles")
+        provider = snapshot.get("database_provider", "unknown")
+        if (isinstance(tiles, list) and tiles) or provider != "unknown":
+            return snapshot
+    return dict(_latest_dashboard_snapshot)
 
 
 @router.websocket("/agent/live")
@@ -54,26 +71,26 @@ async def websocket_endpoint(websocket: WebSocket):
     log: list[str] = []
     _session_activity_log.set(log)
     _current_websocket.set(websocket)
-
-    agent = get_adk_agent(
-        "Dashboard state will be provided by context_update messages; do not assume it is empty."
-    )
+    empty_snapshot = {"tiles": [], "database_provider": "unknown"}
+    _dashboard_snapshot.set(empty_snapshot)
+    global _latest_dashboard_snapshot
+    _latest_dashboard_snapshot = dict(empty_snapshot)
 
     session_service = sessions.InMemorySessionService()
     live_request_queue = LiveRequestQueue()
-    runner = adk.Runner(
-        agent=agent,
-        session_service=session_service,
-        app_name="AgenticBoards",
-    )
 
     coordinator = LiveSessionCoordinator()
+    initial_context_event = asyncio.Event()
+    initial_dashboard_snapshot: dict[str, Any] = {"tiles": [], "database_provider": "unknown"}
 
     stop_event = asyncio.Event()
     live_request_queue_closed = False
     last_sql_info = {"sql": None, "provider": "bigquery"}
     processed_tool_call_keys: set[str] = set()
     initial_context_synced = False
+    has_user_audio = False
+    current_turn_audio_chunks = 0
+    context_injected_once = False
 
     async def send_json_safe(payload: dict[str, Any]) -> bool:
         if websocket.client_state != WebSocketState.CONNECTED:
@@ -106,8 +123,10 @@ async def websocket_endpoint(websocket: WebSocket):
         return f"sig:{hashlib.sha1(signature.encode('utf-8')).hexdigest()}", str(call_id) if call_id else None
 
     async def ensure_model_turn_started() -> str:
+        nonlocal current_turn_audio_chunks
         started, turn_id = coordinator.mark_model_activity()
         if started:
+            current_turn_audio_chunks = 0
             logger.info("[WS] Turn started: %s", turn_id)
             await send_turn_state("model_start", turn_id)
         return turn_id
@@ -126,8 +145,39 @@ async def websocket_endpoint(websocket: WebSocket):
             "Wait for the user to speak or ask a question before taking any action."
         )
 
+    def build_bootstrap_dashboard_context(snapshot: dict[str, Any]) -> str:
+        tiles = snapshot.get("tiles") if isinstance(snapshot, dict) else []
+        provider = snapshot.get("database_provider", "unknown") if isinstance(snapshot, dict) else "unknown"
+        if not isinstance(tiles, list):
+            tiles = []
+
+        if not tiles:
+            return (
+                f"Active provider: {str(provider).upper()}. "
+                "No tiles were provided in the initial dashboard snapshot."
+            )
+
+        lines: list[str] = []
+        for raw_tile in tiles[:30]:
+            if not isinstance(raw_tile, dict):
+                continue
+            tile_id = raw_tile.get("id") or raw_tile.get("tile_id") or "unknown-id"
+            title = raw_tile.get("title") or raw_tile.get("name") or "Untitled tile"
+            tile_type = raw_tile.get("type") or raw_tile.get("kind") or "unknown"
+            lines.append(f"- {title} (id={tile_id}, type={tile_type})")
+
+        remaining = max(0, len(tiles) - len(lines))
+        remainder_line = f"\n...and {remaining} more tile(s)." if remaining else ""
+        return (
+            f"Active provider: {str(provider).upper()}. "
+            f"The dashboard already has {len(tiles)} tile(s) at live-session start.\n"
+            "Current tiles:\n"
+            + ("\n".join(lines) if lines else "- [unparsed tile payload]")
+            + remainder_line
+        )
+
     async def flush_pending_context_if_safe():
-        nonlocal initial_context_synced
+        nonlocal initial_context_synced, context_injected_once
         if not coordinator.should_flush_context():
             return
 
@@ -135,8 +185,37 @@ async def websocket_endpoint(websocket: WebSocket):
         if not pending:
             return
 
+        tiles = pending.payload.get("tiles", [])
+        # Prevent autonomous model actions on session start: don't inject
+        # dashboard context as a user turn until we've received real user audio.
+        # Still ack context_sync so the client can start streaming mic audio.
+        if not has_user_audio:
+            logger.info("[WS] Deferring context injection until first user audio (%s tiles)", len(tiles))
+            coordinator.pending_context = pending
+            if not initial_context_synced:
+                await send_json_safe({"type": "context_sync", "state": "received", "tiles": len(tiles)})
+                initial_context_synced = True
+            return
+
+        # Safe-mode: only inject dashboard context once per live session.
+        # Repeated context injections can be interpreted as new actionable user turns.
+        if context_injected_once:
+            coordinator.last_context_hash = pending.payload_hash
+            logger.info("[WS] Context snapshot updated (%s tiles), skipping reinjection", len(tiles))
+            return
+
+        # Strict safety mode: keep context snapshots server-side but do not inject
+        # them as user turns into the live model. This prevents autonomous
+        # tool chains triggered by context payloads.
+        if not INJECT_CONTEXT_UPDATES_INTO_MODEL:
+            coordinator.last_context_hash = pending.payload_hash
+            logger.info("[WS] Context snapshot accepted (%s tiles), injection disabled", len(tiles))
+            if not initial_context_synced:
+                await send_json_safe({"type": "context_sync", "state": "received", "tiles": len(tiles)})
+                initial_context_synced = True
+            return
+
         try:
-            tiles = pending.payload.get("tiles", [])
             logger.info("[WS] Flushing queued context_update (%s tiles)", len(tiles))
             live_request_queue.send_content(
                 types.Content(
@@ -145,6 +224,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
             )
             coordinator.last_context_hash = pending.payload_hash
+            context_injected_once = True
             if not initial_context_synced:
                 await send_json_safe({"type": "context_sync", "state": "received", "tiles": len(tiles)})
                 initial_context_synced = True
@@ -153,11 +233,13 @@ async def websocket_endpoint(websocket: WebSocket):
             coordinator.pending_context = pending
 
     async def maybe_emit_model_end(force: bool = False):
+        nonlocal current_turn_audio_chunks
         ended_turn_id = coordinator.maybe_end_turn_on_idle(force=force)
         if not ended_turn_id:
             return
 
-        logger.info("[WS] Turn ended: %s", ended_turn_id)
+        logger.info("[WS] Turn ended: %s (audio chunks=%s)", ended_turn_id, current_turn_audio_chunks)
+        current_turn_audio_chunks = 0
         await send_turn_state("model_end", ended_turn_id)
         await flush_pending_context_if_safe()
 
@@ -172,6 +254,8 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.warning("[WS] LiveRequestQueue close failed: %s", e)
 
     async def upstream():
+        nonlocal has_user_audio, initial_dashboard_snapshot
+        global _latest_dashboard_snapshot
         try:
             while not stop_event.is_set():
                 msg = await websocket.receive()
@@ -181,6 +265,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     break
 
                 if "bytes" in msg and msg["bytes"] is not None:
+                    if not has_user_audio:
+                        # Hard gate: ignore mic stream until frontend signals explicit speech start.
+                        continue
                     live_request_queue.send_realtime(
                         types.Blob(data=msg["bytes"], mime_type="audio/pcm;rate=16000")
                     )
@@ -198,8 +285,25 @@ async def websocket_endpoint(websocket: WebSocket):
                 msg_type = data.get("type")
                 logger.info("[WS] Received text message: %s", msg_type)
 
+                if msg_type == "user_speech_start":
+                    if not has_user_audio:
+                        has_user_audio = True
+                        logger.info("[WS] user_speech_start received; enabling audio + context injection")
+                        await flush_pending_context_if_safe()
+                    continue
+
                 if msg_type != "context_update":
                     continue
+
+                # Keep a server-side snapshot for safe, explicit lookup via tool call.
+                initial_dashboard_snapshot = {
+                    "tiles": data.get("tiles", []),
+                    "database_provider": data.get("database_provider", "unknown"),
+                }
+                _dashboard_snapshot.set(initial_dashboard_snapshot)
+                _latest_dashboard_snapshot = dict(initial_dashboard_snapshot)
+                if not initial_context_event.is_set():
+                    initial_context_event.set()
 
                 queued = coordinator.queue_context_update(data)
                 if not queued:
@@ -234,6 +338,24 @@ async def websocket_endpoint(websocket: WebSocket):
         session_id = "live_session_01"
         app_name = "AgenticBoards"
 
+        try:
+            await asyncio.wait_for(initial_context_event.wait(), timeout=1.5)
+            logger.info(
+                "[WS] Initial dashboard snapshot captured before runner start (%s tiles)",
+                len(initial_dashboard_snapshot.get("tiles", [])),
+            )
+        except asyncio.TimeoutError:
+            logger.info("[WS] No initial context_update before runner start; continuing with empty snapshot")
+
+        bootstrap_context = build_bootstrap_dashboard_context(initial_dashboard_snapshot)
+        provider = initial_dashboard_snapshot.get("database_provider", "unknown")
+        agent = get_adk_agent(bootstrap_context, provider)
+        runner = adk.Runner(
+            agent=agent,
+            session_service=session_service,
+            app_name="AgenticBoards",
+        )
+
         await session_service.create_session(user_id=user_id, session_id=session_id, app_name=app_name)
         logger.info("[WS] Session created for %s/%s", user_id, session_id)
 
@@ -250,8 +372,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 if event.content and event.content.parts:
                     for part in event.content.parts:
                         if part.inline_data and part.inline_data.data:
-                            await ensure_model_turn_started()
-                            logger.info("[WS] Model audio chunk received (%s bytes)", len(part.inline_data.data))
+                            started_turn_id = await ensure_model_turn_started()
+                            if started_turn_id:
+                                current_turn_audio_chunks += 1
+                            if current_turn_audio_chunks in (1, 10) or current_turn_audio_chunks % 25 == 0:
+                                logger.info(
+                                    "[WS] Model audio chunk #%s (%s bytes)",
+                                    current_turn_audio_chunks,
+                                    len(part.inline_data.data),
+                                )
                             await websocket.send_bytes(part.inline_data.data)
                         elif part.thought:
                             await ensure_model_turn_started()
@@ -293,6 +422,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     turn_id = await ensure_model_turn_started()
 
                     for fc in func_calls:
+                        if fc.name == "create_text_tile":
+                            logger.warning("[WS] Blocked disallowed live tool call: create_text_tile")
+                            continue
+
                         tool_call_key, tool_call_id = build_tool_call_key(fc, turn_id)
                         if tool_call_key in processed_tool_call_keys:
                             logger.info("[WS] Skipping duplicate tool_call event: %s", tool_call_key)

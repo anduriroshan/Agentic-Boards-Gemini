@@ -1,6 +1,13 @@
 import json
 
-from src.agent.tools import create_data_table, create_kpi_tile, modify_dashboard, update_data_table
+from src.agent.tools import (
+    _filter_results_by_provider,
+    _get_fallback_metadata,
+    create_data_table,
+    create_kpi_tile,
+    modify_dashboard,
+    update_data_table,
+)
 
 
 def _invoke(payload: str) -> dict:
@@ -78,6 +85,20 @@ def test_modify_dashboard_accepts_list_of_json_strings_with_nested_kpi_update():
     assert result.get("kpi_updates")
     assert result["kpi_updates"][0]["tile_id"] == "tile-5"
     assert result["kpi_updates"][0]["subtitle"].startswith("Data range:")
+
+
+def test_modify_dashboard_accepts_title_updates_as_string_with_tile_id():
+    payload = json.dumps([
+        json.dumps({
+            "tile_id": "tile-8",
+            "title_updates": "Top 8 Items by Revenue",
+        })
+    ])
+    result = _invoke(payload)
+    assert "error" not in result
+    assert result.get("title_updates")
+    assert result["title_updates"][0]["tile_id"] == "tile-8"
+    assert result["title_updates"][0]["title"] == "Top 8 Items by Revenue"
 
 
 def test_modify_dashboard_accepts_camel_case_aliases_for_spec_updates():
@@ -170,3 +191,18 @@ def test_update_data_table_converts_row_arrays_to_objects():
         "invoice_and_item_number": "INV-1",
         "date": "2025-01-01",
     }
+
+
+def test_filter_results_by_provider_prefers_bigquery_entries():
+    results = [
+        {"table": "agentic-boards.iowa_liquor_retail_sales.sales", "type": "bigquery"},
+        {"table": "databricks-datasets.tpch.orders", "type": "databricks"},
+    ]
+    filtered = _filter_results_by_provider(results, "bigquery")
+    assert len(filtered) == 1
+    assert filtered[0]["type"] == "bigquery"
+
+
+def test_fallback_metadata_bigquery_excludes_databricks_entries():
+    fallback = _get_fallback_metadata("bigquery")
+    assert all(str(entry.get("type", "")).lower() != "databricks" for entry in fallback)

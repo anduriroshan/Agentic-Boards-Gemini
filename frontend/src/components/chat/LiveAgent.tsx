@@ -52,6 +52,8 @@ const LiveAgent: React.FC = () => {
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const currentPlaybackResolveRef = useRef<(() => void) | null>(null);
   const playbackGenerationRef = useRef(0);
+  const hasSentSpeechStartRef = useRef(false);
+  const speechFrameStreakRef = useRef(0);
 
   const isActiveRef = useRef(false);
   const isModelTurnActiveRef = useRef(false);
@@ -438,6 +440,8 @@ const LiveAgent: React.FC = () => {
     currentTurnIdRef.current = null;
     isModelTurnActiveRef.current = false;
     isActiveRef.current = false;
+    hasSentSpeechStartRef.current = false;
+    speechFrameStreakRef.current = 0;
 
     pendingContextPayloadRef.current = null;
     pendingContextHashRef.current = null;
@@ -995,6 +999,32 @@ const LiveAgent: React.FC = () => {
         }
 
         const input = e.inputBuffer.getChannelData(0);
+
+        if (!hasSentSpeechStartRef.current) {
+          let energy = 0;
+          for (let i = 0; i < input.length; i++) {
+            const s = input[i] || 0;
+            energy += s * s;
+          }
+          const rms = Math.sqrt(energy / Math.max(input.length, 1));
+          if (rms >= 0.02) {
+            speechFrameStreakRef.current += 1;
+          } else {
+            speechFrameStreakRef.current = Math.max(0, speechFrameStreakRef.current - 1);
+          }
+          if (speechFrameStreakRef.current < 2) {
+            return;
+          }
+
+          try {
+            socket.send(JSON.stringify({ type: "user_speech_start" }));
+            hasSentSpeechStartRef.current = true;
+            logger("[AUDIO] user_speech_start sent");
+          } catch {
+            return;
+          }
+        }
+
         const pcmData = new Int16Array(input.length);
         for (let i = 0; i < input.length; i++) {
           pcmData[i] = Math.max(-1, Math.min(1, input[i] || 0)) * 0x7fff;
@@ -1020,6 +1050,8 @@ const LiveAgent: React.FC = () => {
         setIsConnecting(false);
         currentRunId.current = startRun("Live Voice Session");
         contextSyncAckRef.current = false;
+        hasSentSpeechStartRef.current = false;
+        speechFrameStreakRef.current = 0;
         clearContextSyncRetryTimer();
 
         queueContextUpdate();
@@ -1153,27 +1185,19 @@ const LiveAgent: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center p-8 space-y-8 h-full bg-gradient-to-b from-transparent to-muted/20 rounded-xl">
       <div className="relative flex flex-col items-center gap-6">
-        {isActive && (
-          <div className="absolute inset-0 -z-10 flex items-center justify-center">
-            <div className={`absolute w-32 h-32 rounded-full border-2 animate-ping [animation-duration:3s] ${isSpeaking ? "border-blue-500/30" : "border-blue-500/20"}`} />
-            <div className={`absolute w-40 h-40 rounded-full border-2 animate-ping [animation-duration:4s] ${isSpeaking ? "border-blue-400/20" : "border-blue-400/10"}`} />
-          </div>
-        )}
-
         <button
           onClick={toggleLive}
           disabled={isConnecting}
-          className={`group relative p-8 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 z-10 ${
+          className={`group relative p-8 rounded-full shadow-lg border transition-colors duration-200 z-10 ${
             isActive
-              ? (isSpeaking ? "bg-blue-600 animate-pulse shadow-blue-500/50" : "bg-red-500 hover:bg-red-600")
-              : (isConnecting ? "bg-muted scale-95 opacity-50" : "bg-gradient-to-tr from-blue-600 to-indigo-600 hover:shadow-blue-500/25")
+              ? (isSpeaking ? "bg-blue-600 border-blue-600" : "bg-red-500 border-red-500 hover:bg-red-600")
+              : (isConnecting ? "bg-muted border-muted-foreground/20 opacity-80" : "bg-blue-600 border-blue-600 hover:bg-blue-700")
           }`}
         >
-          <div className="absolute inset-0 rounded-full bg-inherit transition-all duration-300 group-hover:blur-xl opacity-50" />
           {isActive ? (
             <MicOff className="w-10 h-10 text-white relative z-10" />
           ) : (
-            <Mic className={`w-10 h-10 text-white relative z-10 ${isConnecting ? "animate-spin" : ""}`} />
+            <Mic className="w-10 h-10 text-white relative z-10" />
           )}
         </button>
 
@@ -1190,6 +1214,9 @@ const LiveAgent: React.FC = () => {
                 ? (isSpeaking ? "Model is responding to your query" : "Talk naturally to explore your data")
                 : (isConnecting ? "Initializing microphone and session" : "Real-time voice interaction for BI insights"))}
           </p>
+          {isConnecting && (
+            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+          )}
         </div>
       </div>
 

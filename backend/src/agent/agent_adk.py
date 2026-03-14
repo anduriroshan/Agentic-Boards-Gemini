@@ -25,7 +25,6 @@ from src.agent.tools import (
     create_kpi_tile as legacy_create_kpi_tile,
     create_data_table as legacy_create_data_table,
     update_data_table as legacy_update_data_table,
-    create_text_tile as legacy_create_text_tile,
     modify_dashboard as legacy_modify_dashboard,
     remove_tiles as legacy_remove_tiles,
     get_bigquery_schema as legacy_get_bigquery_schema,
@@ -50,6 +49,7 @@ _ACTIVITY_TOOL_AGENT: dict[str, tuple[str, str]] = {
     "modify_dashboard": ("DashboardAgent", "layout"),
     "remove_tiles": ("DashboardAgent", "layout"),
     "get_recent_activity": ("Orchestrator", "history"),
+    "get_dashboard_snapshot": ("Orchestrator", "layout"),
 }
 
 def summarize_tool_output(result_text: str, max_rows: int = 15) -> str:
@@ -237,10 +237,18 @@ async def create_text_tile(
     title: str, 
     markdown: str
 ) -> str:
-    """Add a Markdown / Text tile to the dashboard."""
-    return await asyncio.to_thread(legacy_create_text_tile.invoke, {
+    """Live-mode safety stub for text tile creation.
+
+    We keep this tool registered to avoid hard failures if the model hallucinates
+    create_text_tile, but we block mutations in live mode for guardrail safety.
+    """
+    await send_activity_status("create_text_tile", "Blocked in live mode (out-of-scope/safety policy)")
+    await send_activity_status("create_text_tile", "No dashboard changes applied", status="done")
+    return json.dumps({
+        "action": "create_text_tile",
+        "blocked": True,
+        "error": "create_text_tile is disabled in live mode. Ask a dashboard/data question instead.",
         "title": title,
-        "markdown": markdown
     })
 
 
@@ -288,18 +296,79 @@ async def get_recent_activity() -> str:
     """
     await send_activity_status("get_recent_activity", "Fetching session activity log...")
     try:
-        from src.api.routes_live import get_session_activity
+        from src.api.routes_live import get_dashboard_snapshot, get_session_activity
         activity = get_session_activity()
+        snapshot = get_dashboard_snapshot() or {}
+        tiles = snapshot.get("tiles", []) if isinstance(snapshot, dict) else []
+        provider = snapshot.get("database_provider", "unknown") if isinstance(snapshot, dict) else "unknown"
+
         if not activity:
             await send_activity_status("get_recent_activity", "Activity Log Checked", status="done")
-            return "No tool calls have been documented in this session yet."
+            return (
+                "No tool calls have been documented in this session yet. "
+                f"Current dashboard snapshot: {len(tiles)} tile(s), provider={provider}."
+            )
         
         await send_activity_status("get_recent_activity", f"Retrieved {len(activity)} entries", status="done")
-        return "\n".join([f"- {a}" for a in activity])
+        summary_header = f"Current dashboard snapshot: {len(tiles)} tile(s), provider={provider}."
+        return summary_header + "\n" + "\n".join([f"- {a}" for a in activity])
     except Exception as e:
         logger.warning(f"Failed to fetch activity log: {e}")
         await send_activity_status("get_recent_activity", "Failed to retrieve activity", status="done")
         return "Activity log is currently unavailable."
+
+
+async def get_dashboard_snapshot() -> str:
+    """Get the latest dashboard tiles and active provider from live context_update messages."""
+    await send_activity_status("get_dashboard_snapshot", "Reading current dashboard snapshot...")
+    try:
+        from src.api.routes_live import get_dashboard_snapshot as read_snapshot
+
+        snapshot = read_snapshot() or {}
+        tiles = snapshot.get("tiles", [])
+        provider = snapshot.get("database_provider", "unknown")
+        logger.info(
+            "[WS] get_dashboard_snapshot tool resolved provider=%s tile_count=%s",
+            provider,
+            len(tiles) if isinstance(tiles, list) else "invalid",
+        )
+        await send_activity_status(
+            "get_dashboard_snapshot",
+            f"Snapshot ready ({len(tiles)} tiles, provider={provider})",
+            status="done",
+        )
+        normalized_tiles: list[dict[str, Any]] = []
+        for raw_tile in tiles:
+            if not isinstance(raw_tile, dict):
+                continue
+            normalized_tiles.append(
+                {
+                    "id": raw_tile.get("id") or raw_tile.get("tile_id"),
+                    "title": raw_tile.get("title") or raw_tile.get("name"),
+                    "type": raw_tile.get("type") or raw_tile.get("kind"),
+                }
+            )
+        if not normalized_tiles:
+            return f"Dashboard snapshot: provider={provider}, tile_count=0."
+
+        lines = [f"- id={t.get('id')}, title={t.get('title')}, type={t.get('type')}" for t in normalized_tiles[:30]]
+        remaining = max(0, len(normalized_tiles) - len(lines))
+        suffix = f"\n...and {remaining} more tile(s)." if remaining else ""
+        return (
+            f"Dashboard snapshot: provider={provider}, tile_count={len(normalized_tiles)}.\n"
+            "Tiles:\n"
+            + "\n".join(lines)
+            + suffix
+        )
+    except Exception as e:
+        logger.warning("Failed to fetch dashboard snapshot: %s", e)
+        await send_activity_status("get_dashboard_snapshot", "Snapshot unavailable", status="done")
+        return json.dumps(
+            {
+                "error": "dashboard_snapshot_unavailable",
+                "details": str(e),
+            }
+        )
 
 # ── Agent Definition ──────────────────────────────────────────────────────
 
@@ -307,7 +376,17 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty.", 
     """Initialize and return the Agentic Boards ADK agent."""
     
     connection_flag = f"\n[ACTIVE CONNECTION: {database_provider.upper()}]\n" if database_provider else ""
-    instructions = connection_flag + REACT_SYSTEM_PROMPT.format(dashboard_context=dashboard_context)
+    runtime_rules = (
+        "\n[RUNTIME LIVE RULES]\n"
+        "- To know current dashboard tiles, use get_dashboard_snapshot.\n"
+        "- Do NOT assume the dashboard is empty unless get_dashboard_snapshot confirms it.\n"
+        "- Use get_recent_activity only when the user explicitly asks for status/history.\n"
+        "- LIVE SCOPE RESTRICTION: This assistant is only for dashboard/data analytics in Agentic Boards.\n"
+        "- If a user asks an out-of-scope question (general knowledge, lifestyle, coding tutorial, etc.), politely refuse in one short sentence and ask them to ask a dashboard/data question.\n"
+        "- For out-of-scope requests, do NOT call any tool and do NOT mutate dashboard tiles.\n"
+        "- create_text_tile is disabled in LIVE mode. Never attempt to call it.\n"
+    )
+    instructions = connection_flag + REACT_SYSTEM_PROMPT.format(dashboard_context=dashboard_context) + runtime_rules
     
     # ── Debug Logs ──
     logger.info(f"ADK Agent Initialization: settings.gemini_model={settings.gemini_model}")
@@ -351,6 +430,7 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty.", 
             modify_dashboard,
             remove_tiles,
             get_recent_activity,
+            get_dashboard_snapshot,
         ],
         generate_content_config=types.GenerateContentConfig(
             response_modalities=[types.Modality.AUDIO]
