@@ -376,6 +376,28 @@ async def get_dashboard_snapshot() -> str:
             }
         )
 
+async def get_tile_data(tile_id: str) -> str:
+    """Get the full data for a specific tile ID. Use this when you need deeper analysis of a specific chart or table."""
+    await send_activity_status("get_tile_data", f"Drilling down into tile {tile_id}...")
+    try:
+        from src.api.routes_live import get_dashboard_snapshot as read_snapshot
+        snapshot = read_snapshot() or {}
+        tiles = snapshot.get("tiles", [])
+        
+        target_tile = next((t for t in tiles if (t.get("id") == tile_id or t.get("tile_id") == tile_id)), None)
+        
+        if not target_tile:
+            await send_activity_status("get_tile_data", "Tile not found", status="done")
+            return f"Tile with ID '{tile_id}' not found in the current dashboard."
+
+        await send_activity_status("get_tile_data", f"Full data for '{target_tile.get('title')}' retrieved", status="done")
+        return json.dumps(target_tile, indent=2)
+
+    except Exception as e:
+        logger.warning("Failed to fetch tile data: %s", e)
+        await send_activity_status("get_tile_data", "Drill-down failed", status="done")
+        return f"Error fetching tile data: {str(e)}"
+
 # ── Agent Definition ──────────────────────────────────────────────────────
 
 def get_adk_agent(dashboard_context: str = "The dashboard is currently empty.", database_provider: str = None):
@@ -386,11 +408,11 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty.", 
         "\n[RUNTIME LIVE RULES]\n"
         "- To know current dashboard tiles, use get_dashboard_snapshot.\n"
         "- Do NOT assume the dashboard is empty unless get_dashboard_snapshot confirms it.\n"
+        "- If a dashboard has many tiles, get_dashboard_snapshot only shows a summary. Use get_tile_data to see the FULL rows/logic for a specific tile.\n"
         "- Use get_recent_activity only when the user explicitly asks for status/history.\n"
         "- LIVE SCOPE RESTRICTION: This assistant is only for dashboard/data analytics in Agentic Boards.\n"
         "- If a user asks an out-of-scope question (general knowledge, lifestyle, coding tutorial, etc.), politely refuse in one short sentence and ask them to ask a dashboard/data question.\n"
         "- For out-of-scope requests, do NOT call any tool and do NOT mutate dashboard tiles.\n"
-        "- create_text_tile is disabled in LIVE mode. Never attempt to call it.\n"
     )
     instructions = connection_flag + REACT_SYSTEM_PROMPT.format(dashboard_context=dashboard_context) + runtime_rules
     
@@ -437,6 +459,7 @@ def get_adk_agent(dashboard_context: str = "The dashboard is currently empty.", 
             remove_tiles,
             get_recent_activity,
             get_dashboard_snapshot,
+            get_tile_data,
         ],
         generate_content_config=types.GenerateContentConfig(
             response_modalities=[types.Modality.AUDIO]
