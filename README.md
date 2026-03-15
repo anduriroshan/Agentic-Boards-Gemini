@@ -1,77 +1,99 @@
-# Agentic Boards
+# Agentic Boards - Conversational Business Intelligence
 
-**Agentic Boards** is a conversational Business Intelligence (BI) platform that transforms how you interact with your enterprise data. Rather than relying on static, pre-built dashboards, Agentic Boards allows users to generate instant, data-driven visualizations and insights using natural language.
+Conversational BI Platform for Enterprise Data Analytics  
+**Live Demo:** [agentic-boards.live](https://agentic-boards.live)
 
-Powered by a ReAct agent architecture (LangGraph) and large language models, the platform securely connects to Databricks to discover schema metadata, execute optimized SQL queries, and stream interactive visualizations directly back to your browser in real time.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![React 19](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agent%20Orchestration-1f3937.svg)](https://github.com/langchain-ai/langgraph)
+[![LangChain](https://img.shields.io/badge/LangChain-Framework-2ea44f.svg)](https://www.langchain.com/)
+[![Google ADK](https://img.shields.io/badge/Google%20ADK-Agent%20Dev%20Kit-4285F4.svg)](https://github.com/google/generative-ai-python)
 
----
-
-## ✨ Features
-
-### Conversational BI
-Simply type natural language questions (e.g., *"Show me top 10 products by sales in May as a donut chart"*) and watch as the system dynamically builds the necessary data pipelines and generates the visualization. 
-
-### No Pre-built Dashboards
-Every chart, table, and layout is generated on-demand. Agentic Boards provides a flexible canvas that adapts to your analytical needs instantly.
-
-### Real-Time Streaming & Transparency
-The platform leverages Server-Sent Events (SSE) to stream the agent's thought processes directly to the UI. The **Agent Activity Panel** provides a transparent, live view of the decision-making process, showing exactly how your question is being answered step-by-step.
-
-### 🔐 Secure Multi-User Access
-Agentic Boards now features full **Google OAuth 2.0 Integration**, allowing multiple users to sign in and maintain their own private environments.
-
-### 💾 Persistent Workspaces
-Unlike many BI tools that rely on temporary browser storage, Agentic Boards persists your **Dashboards and Chat History** in a backend SQLite database. This ensures your work is saved securely and follows you across different devices and browsers.
+**[Website](https://agentic-boards.live) • [Documentation](#getting-started) • [Report Issue](https://github.com) • [Contribute](https://github.com)**
 
 ---
 
-## 📊 Dashboard Capabilities
+**Agentic Boards** is a conversational Business Intelligence platform that generates interactive dashboards from natural language queries. Instead of navigating static dashboards, users ask questions in plain English and the system finds data, writes SQL, executes queries, and creates visualizations in real-time.
 
-The Agentic Boards dashboard is designed to be highly interactive and customizable:
-
-- **Dynamic Grid Layout:** A responsive, drag-and-drop 12-column grid layout lets you organize your insights exactly how you want.
-- **Interactive Visualizations:** Renders beautiful, responsive charts using Vega-Lite (bar, line, arc, etc.) and interactive data tables.
-- **Session Management:** Save, update, and manage multiple workspace sessions. Easily switch between different analytical contexts or start fresh with a "New Session".
-- **AI-Driven Modifications:** Want to change a chart? Just ask the AI to resize it, move it, change its type, or update its title.
-- **Contextual Reasoning:** The AI can answer analytical questions ("What are the key insights?") by reasoning over the data already present on the dashboard.
-- **Databricks Integration:** Features an easy-to-use settings modal to configure your connection, switch catalogs and schemas.
+Built with the Google Agent Development Kit (ADK), LangGraph ReAct agents, and Gemini Live API, Agentic Boards searches your Databricks and BigQuery schemas using semantic embeddings (Milvus). It generates SQL queries, executes them, and streams the agent's reasoning and results to your browser so you can see every step.
 
 ---
 
-## 🤖 The Agent System
+## Features
 
-At the core of Agentic Boards is a sophisticated LLM-powered ReAct agent system. The orchestrator delegates tasks to specialized sub-agents based on the user's request:
+### Natural Language Analytics
+Ask questions in plain English like "Show me top 10 products by sales in May as a donut chart." The system discovers relevant tables via semantic search, generates SQL, executes queries, and creates interactive visualizations. 
 
-### 🔍 DataAgent
-The **DataAgent** is responsible for understanding your enterprise data.
-* **Capabilities:** Connects to Databricks, discovers relevant tables and columns using semantic/keyword search, and generates optimized, dialect-specific SQL queries to extract exactly what is needed.
+### AI-Powered Dashboard Generation
+Every chart, table, and layout is generated on-demand by AI agents. The system chooses visualization types (bar, line, pie, scatter), encodes data dimensions, and responds to your queries in real-time.
 
-### 📈 VizAgent
-The **VizAgent** transforms raw data into actionable visual insights.
-* **Capabilities:** Evaluates data shapes and generates rich, responsive Vega-Lite chart specifications and interactive React data tables. It handles complex data mappings to ensure visual accuracy.
+### Real-Time Agent Transparency
+Watch AI agents think in real-time via WebSocket streaming. The **Agent Activity Panel** shows every step: which tables are being searched, what SQL is being generated, which tools are executing, and how data is being transformed into visualizations.
 
-### 🎨 DashboardAgent
-The **DashboardAgent** manages the spatial layout and presentation of your insights.
-* **Capabilities:** Modifies the dashboard based on natural language commands. It can resize tiles, reposition elements, update chart types, rename headers, and selectively remove components from the canvas.
+### Multi-Tenant Workspaces
+Google OAuth 2.0 enables secure multi-user access, with each user maintaining isolated dashboards, chat history, and session state. Role-based data access through your warehouse security policies.
+
+### Persistent Analysis & History
+All dashboards, charts, and conversations are persisted in a backend database, not temporary browser storage. Your analytical work follows you across devices and browsers, with full chat history and dashboard snapshots available for reference.
 
 ---
 
-## 🛠️ Technology Stack
+## Dashboard Capabilities
+
+The Agentic Boards dashboard combines AI-driven generation with manual control:
+
+- **Responsive Grid Layout:** 12-column drag-and-drop grid similar to Notion/Excel for organizing insights
+- **Visualizations:** Bar, line, area, pie, scatter, and more automatically chosen based on your data
+- **Interactive Data Tables:** Column formatting, null/NaN handling, pageable results
+- **KPI Cards:** Metric tiles with spark lines and thresholds
+- **AI-Driven Editing:** Modify tiles with natural language commands like "Add a bar graph showing top products by revenue" or "Change the color of this card"
+- **Contextual AI Reasoning:** Agents analyze existing tiles to answer questions without re-querying
+- **Multi-Warehouse Context:** Query Databricks and BigQuery in the same session with automatic provider switching
+
+---
+
+## The Agent System
+
+Agentic Boards uses a multi-layered agent architecture combining the Google Agent Development Kit (ADK) with LangGraph ReAct agents. The system supports both real-time streaming (via Gemini Live API) and traditional ReAct orchestration, with semantic schema discovery via Milvus vector embeddings.
+
+### DataAgent
+Responsible for finding and querying enterprise data.
+* **Capabilities:** Searches Databricks and BigQuery schemas using semantic + keyword search (via Milvus embeddings), discovers relevant tables and columns, generates dialect-specific SQL, validates queries for safety (read-only enforcement), and executes with automatic provider switching.
+
+### VizAgent
+Transforms raw data into interactive visual insights.
+* **Capabilities:** Analyzes data shapes to select visualization types (bar, line, area, pie, scatter, table), encodes data dimensions, generates Vega-Lite specifications and interactive React tables, handles null/NaN/Infinity values, and creates KPI metric cards.
+
+### DashboardAgent
+Manages spatial layout and presentation of insights.
+* **Capabilities:** Modifies dashboard tiles based on natural language ("Make this wider", "Move to top"), updates chart specs/colors/titles, repositions/resizes tiles on the 12-column grid, manages layout state, and removes components on command.
+
+### Orchestrator Agent
+Coordinates high-level analysis and meta-reasoning.
+* **Capabilities:** Answers questions about previous actions ("What have you done?"), accesses session history and dashboard snapshots, reasons over existing tiles without re-querying, and manages multi-step workflows.
+
+---
+
+## Technology Stack
 
 | Component | Technology |
 |---|---|
 | **Frontend** | React 19, TypeScript, Vite, Zustand, Vega-Lite, Tailwind CSS |
 | **Backend** | FastAPI (Python 3.13), LangGraph, LangChain, SQLAlchemy |
+| **LLM Engines** | Gemini (Live API & Batch), OpenAI, Vertex AI |
+| **Agent Framework** | Google Agent Development Kit (ADK) + LangGraph ReAct |
 | **Authentication** | Google OAuth 2.0 (Authlib) |
-| **Database** | SQLite (for Users, Sessions, and Workspaces) |
-| **Data Warehouse** | Databricks (PySpark / Databricks Connect) |
-| **Vector Store & ML** | Milvus, `sentence-transformers` |
+| **Session Database** | SQLite (Users, Chat History, Dashboards) |
+| **Data Warehouses** | Databricks (SQL Warehouse / Spark) & BigQuery |
+| **Schema Search** | Milvus (Vector Embeddings), Semantic + Keyword |
+| **Visualization** | Vega-Lite, Interactive Tables, KPI Cards |
 
 ---
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before you can run Agentic Boards, ensure you have:
 
@@ -84,20 +106,20 @@ Before you can run Agentic Boards, ensure you have:
 ### Accounts & Credentials You'll Need
 To run Agentic Boards, you need **four things**:
 
-1. **Gemini API Key** — Enables the AI engine to understand questions and generate SQL
+1. **GCP Service Account** — Provides access to Gemini via Vertex AI
 2. **Google OAuth Credentials** — Allows users to sign in with their Google account
 3. **Databricks Account & Credentials** — The cloud data warehouse where your data lives
-4. **GCP Project** — Google Cloud infrastructure for additional services
+4. **GCP Project** — Google Cloud infrastructure (with Vertex AI API enabled)
 
 **Time estimate to set up credentials: ~15-20 minutes.**
 
 ---
 
-## 🔐 Step-by-Step Credential Setup
+## Step-by-Step Credential Setup
 
 ### Step 1: Create a Google Cloud Project (5 min)
 
-**Why you need this:** Google Cloud is where you'll create both your Gemini API key and OAuth credentials. Think of it as a container for all your Google services.
+**Why you need this:** Google Cloud is where you'll create both your GCP project and OAuth credentials. Think of it as a container for all your Google services.
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Click the **project dropdown** at the top (currently says "Select a project")
@@ -110,35 +132,45 @@ To run Agentic Boards, you need **four things**:
 
 ---
 
-### Step 2: Enable Required APIs (5 min)
+### Step 2: Enable Required APIs (3 min)
 
 **Why you need this:** APIs are like "plugins" that let your app talk to Google services. You need to turn these on.
 
-1. In Google Cloud Console, search for **"Cloud Logging API"** in the search bar
+1. In Google Cloud Console, search for **"Vertex AI API"** in the search bar
 2. Click on the result → Click **ENABLE**
 3. Repeat this for:
-   - **VertexAI API**
-   - **BigQuery API**
-   - **BigQuery Connection API**
-   - **Artifact Registry API**
+   - **BigQuery API** (for querying data)
+   - **IAM API** (for service account access)
 
-*(Don't worry if you don't use all of these — they're needed for the full feature set)*
+*(These are the core APIs needed for local setup)*
 
 ---
 
-### Step 3: Get Your Gemini API Key (3 min)
+### Step 3: Create a GCP Service Account (5 min)
 
-**What is this?** Your Gemini API key is a secret password that lets Agentic Boards use Google's AI (similar to how Netflix uses a password to verify you're a real customer).
+**What is this?** A service account is a special Google Cloud account that lets your application access Vertex AI (and Gemini through it). Think of it as a password that proves your app is authorized.
 
 **Where to get it:**
 
-1. Go to [Google AI Studio](https://aistudio.google.com/)
-2. Click **Get API Key** (top-right corner)
-3. Click **Create API Key in new Google Cloud project**
-4. A popup will show your key — **Copy it and save it somewhere safe** (you'll need it in 10 minutes)
-5. Keep this page open for now
+1. Go back to [Google Cloud Console](https://console.cloud.google.com/)
+2. In the left sidebar, click **IAM & Admin** → **Service Accounts**
+3. Click **Create Service Account**
+4. Fill in:
+   - **Service account name:** `agentic-boards`
+   - **Service account ID:** auto-generated (leave as-is)
+5. Click **Create and Continue**
+6. On the next page, click **Grant this service account access to project**
+7. Add these roles:
+   - **Vertex AI User** (for Gemini access)
+   - **BigQuery Admin** (for BigQuery access)
+8. Click **Continue** then **Done**
+9. Back on the Service Accounts list, click your new service account
+10. Click the **Keys** tab
+11. Click **Add Key** → **Create new key**
+12. Choose **JSON** and click **Create**
+13. A JSON file will download — **Save this file in your `backend/` folder as `service_account.json`**
 
-**Where it goes in config:** This becomes your `GEMINI_API_KEY` in the `.env` file.
+**Where it goes in config:** This becomes your `GCP_SERVICE_ACCOUNT` (path to the JSON file) in the `.env` file.
 
 ---
 
@@ -178,9 +210,9 @@ To run Agentic Boards, you need **four things**:
 
 ### Step 5: Create a Databricks Account & Credentials (5 min)
 
-**What is Databricks?** Databricks is a cloud platform where your company stores data (like a giant Excel but much more powerful). Agentic Boards reads from your Databricks database and generates charts.
+**What is Databricks?** Databricks is a cloud platform where data is stored. Agentic Boards reads from your Databricks database and generates visualizations.
 
-**Note:** Databricks offers a **free community tier** ([create account here](https://www.databricks.com/try-databricks)). You can test with sample data they provide.
+**Free Option:** Databricks offers a free community tier ([create account here](https://www.databricks.com/try-databricks)). You can test with sample data they provide.
 
 **To get your credentials:**
 
@@ -209,16 +241,7 @@ To run Agentic Boards, you need **four things**:
 
 ---
 
-### Step 6: Set GCP Project ID (1 min)
-
-From your Google Cloud Console:
-1. Click the **project dropdown** at the top
-2. Copy the **Project ID** (not the project name)
-3. This becomes your `GCP_PROJECT_ID` in `.env`
-
----
-
-## ⚡ Quick Start: Docker Compose (Easiest - 2 minutes)
+## Quick Start: Docker Compose (Easiest - 2 minutes)
 
 Now that you have all your credentials, let's run the application.
 
@@ -234,10 +257,11 @@ cp .env.example backend/.env
 Open `backend/.env` in your text editor and fill in these fields with the values you collected:
 
 ```env
-# ── LLM (from Step 3) ──
-GEMINI_API_KEY=<your-gemini-api-key-here>
-GCP_PROJECT_ID=<your-gcp-project-id-from-step-6>
+# ── LLM (from Step 3 - Vertex AI via Service Account) ──
+GCP_PROJECT_ID=<your-gcp-project-id-from-step-1>
 GCP_REGION=us-central1
+GCP_SERVICE_ACCOUNT=service_account.json
+GOOGLE_APPLICATION_CREDENTIALS=service_account.json
 
 # ── Google OAuth (from Step 4) ──
 GOOGLE_CLIENT_ID=<your-client-id-here>
@@ -262,7 +286,7 @@ MILVUS_URI=./data/milvus_data.db
 MILVUS_ENABLED=true
 ```
 
-**💡 Tip:** If you don't know the Databricks catalog/schema name, use `main` and `default` — they're the defaults.
+**Tip:** If you don't know the Databricks catalog/schema name, use `main` and `default` — they're the defaults.
 
 ### 3. Run with Docker Compose
 
@@ -288,7 +312,7 @@ You should see the Agentic Boards login screen. Sign in with your Google account
 
 ---
 
-## 🛠️ Local Development Setup (Alternative - for developers)
+## Local Development Setup
 
 If you want to develop or debug the frontend and backend separately:
 
@@ -335,7 +359,7 @@ The frontend automatically proxies API calls to `http://localhost:8000`.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Agentic-Boards-Gemini/
@@ -368,7 +392,7 @@ Agentic-Boards-Gemini/
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### "Authentication Failed" or "401 Unauthorized"
 
@@ -441,15 +465,24 @@ Then access at `http://localhost:9001`
 
 ---
 
-### "API Key Invalid" or "403 Permission Denied"
+### "Permission Denied" or "Service Account Cannot Access Vertex AI"
 
-**Cause:** Your Gemini API key is incorrect or expired.
+**Cause:** Service account doesn't have the correct roles, or the JSON key file is missing/corrupted.
 
 **Fix:**
-1. Go back to [Google AI Studio](https://aistudio.google.com/)
-2. Click **API key** → Create a new one
-3. Copy the new key to `GEMINI_API_KEY` in `backend/.env`
-4. Restart the app
+1. Verify `service_account.json` exists in your `backend/` folder
+2. In Google Cloud Console, go to **IAM & Admin** → **Service Accounts**
+3. Click your `agentic-boards` service account
+4. Click **Roles** tab and verify it has:
+   - **Vertex AI User** (for Gemini access)
+   - **BigQuery Admin** (for BigQuery access)
+5. If roles are missing, click **Add Role** and add them
+6. If the JSON file is corrupted, regenerate it:
+   - Go to **Keys** tab
+   - Delete the old key
+   - Click **Add Key** → **Create new key** → **JSON**
+   - Replace the JSON file in your `backend/` folder
+7. Restart the app: `docker compose down && docker compose up --build`
 
 ---
 
@@ -484,16 +517,16 @@ docker compose up --build
 
 ---
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Databricks Documentation](https://docs.databricks.com/) — Learn Databricks syntax and features
-- [Google AI Studio Guide](https://support.google.com/aistudio/answer/13824549) — Gemini API help
+- [Vertex AI Documentation](https://cloud.google.com/vertex-ai/docs) — Vertex AI and Gemini API setup
 - [Google Cloud OAuth Setup](https://developers.google.com/identity/protocols/oauth2) — Technical OAuth details
 - [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) — Agent architecture internals
 
 ---
 
-## 🚀 Deployment
+## Deployment
 
 For production deployment to Google Cloud Run, see [GCP_DEPLOYMENT.md](GCP_DEPLOYMENT.md).
 
@@ -501,7 +534,7 @@ For additional local deployment options, see [LOCAL_DEPLOYMENT.md](LOCAL_DEPLOYM
 
 ---
 
-## 📝 License
+## License
 
 This project is licensed under the [LICENSE](LICENSE) file in the repository.
 
