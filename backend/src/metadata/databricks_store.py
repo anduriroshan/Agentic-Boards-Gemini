@@ -32,10 +32,14 @@ class DatabricksMetadataStore:
     def _get_client(self) -> MilvusClient:
         if self._client is None:
             import os
+            from pathlib import Path
             # Ensure path is absolute for Milvus Lite
             uri = settings.milvus_uri
             if not uri.startswith(("http://", "https://")):
-                uri = os.path.abspath(uri)
+                # Resolve to absolute path and ensure directory exists
+                path = Path(uri).resolve()
+                path.parent.mkdir(parents=True, exist_ok=True)
+                uri = str(path)
                 
             logger.info(f"[Milvus] Connecting to: {uri}")
             client_kwargs = {"uri": uri}

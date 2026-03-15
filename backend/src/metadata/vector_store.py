@@ -26,11 +26,20 @@ class MilvusVectorStore:
     def _get_client(self) -> MilvusClient:
         """Initialize and return the MilvusClient."""
         if self._client is None:
+            import os
+            from pathlib import Path
+            uri = settings.milvus_uri
+            if not uri.startswith(("http://", "https://")):
+                # Resolve to absolute path and ensure directory exists
+                path = Path(uri).resolve()
+                path.parent.mkdir(parents=True, exist_ok=True)
+                uri = str(path)
+
             self._client = MilvusClient(
-                uri=settings.milvus_uri,
+                uri=uri,
                 token=settings.milvus_token
             )
-            logger.info("Initialized MilvusClient with URI: %s", settings.milvus_uri)
+            logger.info("Initialized MilvusClient (Cube) with URI: %s", uri)
         return self._client
 
     def _ensure_collection(self):
