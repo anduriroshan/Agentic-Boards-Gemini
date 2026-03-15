@@ -237,19 +237,15 @@ async def create_text_tile(
     title: str, 
     markdown: str
 ) -> str:
-    """Live-mode safety stub for text tile creation.
-
-    We keep this tool registered to avoid hard failures if the model hallucinates
-    create_text_tile, but we block mutations in live mode for guardrail safety.
-    """
-    await send_activity_status("create_text_tile", "Blocked in live mode (out-of-scope/safety policy)")
-    await send_activity_status("create_text_tile", "No dashboard changes applied", status="done")
-    return json.dumps({
-        "action": "create_text_tile",
-        "blocked": True,
-        "error": "create_text_tile is disabled in live mode. Ask a dashboard/data question instead.",
+    """Add a Markdown / Text tile to the dashboard for annotations and insights."""
+    await send_activity_status("create_text_tile", f"Adding annotation: {title}...")
+    from src.agent.tools import create_text_tile as legacy_create_text_tile
+    res = await asyncio.to_thread(legacy_create_text_tile.invoke, {
         "title": title,
+        "markdown": markdown
     })
+    await send_activity_status("create_text_tile", "Annotation Added", status="done")
+    return res
 
 
 async def modify_dashboard(
@@ -318,8 +314,10 @@ async def get_recent_activity() -> str:
         return "Activity log is currently unavailable."
 
 
+from src.utils.summarizer import summarize_tile_content
+
 async def get_dashboard_snapshot() -> str:
-    """Get the latest dashboard tiles and active provider from live context_update messages."""
+    """Get the latest dashboard tiles, active provider, and a summary of the data in each tile."""
     await send_activity_status("get_dashboard_snapshot", "Reading current dashboard snapshot...")
     try:
         from src.api.routes_live import get_dashboard_snapshot as read_snapshot
@@ -327,36 +325,44 @@ async def get_dashboard_snapshot() -> str:
         snapshot = read_snapshot() or {}
         tiles = snapshot.get("tiles", [])
         provider = snapshot.get("database_provider", "unknown")
-        logger.info(
-            "[WS] get_dashboard_snapshot tool resolved provider=%s tile_count=%s",
-            provider,
-            len(tiles) if isinstance(tiles, list) else "invalid",
-        )
+        
         await send_activity_status(
             "get_dashboard_snapshot",
-            f"Snapshot ready ({len(tiles)} tiles, provider={provider})",
+            f"Snapshot ready ({len(tiles)} tiles)",
             status="done",
         )
         normalized_tiles: list[dict[str, Any]] = []
         for raw_tile in tiles:
             if not isinstance(raw_tile, dict):
                 continue
+            
+            t_id = raw_tile.get("id") or raw_tile.get("tile_id")
+            title = raw_tile.get("title") or raw_tile.get("name")
+            t_type = raw_tile.get("type") or raw_tile.get("kind")
+            
+            summary = summarize_tile_content(raw_tile)
+            
             normalized_tiles.append(
                 {
-                    "id": raw_tile.get("id") or raw_tile.get("tile_id"),
-                    "title": raw_tile.get("title") or raw_tile.get("name"),
-                    "type": raw_tile.get("type") or raw_tile.get("kind"),
+                    "id": t_id,
+                    "title": title,
+                    "type": t_type,
+                    "summary": summary
                 }
             )
+            
         if not normalized_tiles:
             return f"Dashboard snapshot: provider={provider}, tile_count=0."
 
-        lines = [f"- id={t.get('id')}, title={t.get('title')}, type={t.get('type')}" for t in normalized_tiles[:30]]
+        lines = [
+            f"- id={t.get('id')}, title='{t.get('title')}', type={t.get('type')}\n  Summary: {t.get('summary')}" 
+            for t in normalized_tiles[:20] # Limit to 20 for context safety
+        ]
         remaining = max(0, len(normalized_tiles) - len(lines))
         suffix = f"\n...and {remaining} more tile(s)." if remaining else ""
         return (
             f"Dashboard snapshot: provider={provider}, tile_count={len(normalized_tiles)}.\n"
-            "Tiles:\n"
+            "CURRENT TILES AND DATA:\n"
             + "\n".join(lines)
             + suffix
         )

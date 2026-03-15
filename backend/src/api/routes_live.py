@@ -132,20 +132,26 @@ async def websocket_endpoint(websocket: WebSocket):
         return turn_id
 
     def build_context_injection(data: dict[str, Any]) -> str:
+        from src.utils.summarizer import summarize_tile_content
         tiles = data.get("tiles", [])
+        summaries = []
+        for t in tiles[:15]:
+             summaries.append(f"- {t.get('title', 'Tile')}: {summarize_tile_content(t)}")
+        
         provider = data.get("database_provider", "databricks")
         connection_flag = f"[ACTIVE CONNECTION: {provider.upper()}]"
         return (
             f"SYSTEM NOTIFICATION: {connection_flag}\n"
             "The user has updated or loaded a dashboard session. "
-            f"Current tiles: {json.dumps(tiles)}. "
-            "Update your internal memory with these tile names and IDs immediately. "
+            f"Tile Summaries:\n" + "\n".join(summaries) + "\n"
+            "Update your internal memory with these tile details immediately. "
             "STRICTLY follow the ACTIVE CONNECTION flag when choosing SQL executors. "
             "DO NOT call any tools or speak in response to this message. "
             "Wait for the user to speak or ask a question before taking any action."
         )
 
     def build_bootstrap_dashboard_context(snapshot: dict[str, Any]) -> str:
+        from src.utils.summarizer import summarize_tile_content
         tiles = snapshot.get("tiles") if isinstance(snapshot, dict) else []
         provider = snapshot.get("database_provider", "unknown") if isinstance(snapshot, dict) else "unknown"
         if not isinstance(tiles, list):
@@ -158,20 +164,20 @@ async def websocket_endpoint(websocket: WebSocket):
             )
 
         lines: list[str] = []
-        for raw_tile in tiles[:30]:
+        for raw_tile in tiles[:15]:
             if not isinstance(raw_tile, dict):
                 continue
             tile_id = raw_tile.get("id") or raw_tile.get("tile_id") or "unknown-id"
             title = raw_tile.get("title") or raw_tile.get("name") or "Untitled tile"
-            tile_type = raw_tile.get("type") or raw_tile.get("kind") or "unknown"
-            lines.append(f"- {title} (id={tile_id}, type={tile_type})")
+            summary = summarize_tile_content(raw_tile)
+            lines.append(f"- {title} (id={tile_id})\n  Data: {summary}")
 
         remaining = max(0, len(tiles) - len(lines))
         remainder_line = f"\n...and {remaining} more tile(s)." if remaining else ""
         return (
             f"Active provider: {str(provider).upper()}. "
             f"The dashboard already has {len(tiles)} tile(s) at live-session start.\n"
-            "Current tiles:\n"
+            "Current tiles and data:\n"
             + ("\n".join(lines) if lines else "- [unparsed tile payload]")
             + remainder_line
         )
@@ -419,55 +425,53 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 func_calls = event.get_function_calls()
                 if func_calls:
-                    turn_id = await ensure_model_turn_started()
+                        # Ensure model turn started before sending tool events
+                        turn_id = await ensure_model_turn_started()
 
-                    for fc in func_calls:
-                        if fc.name == "create_text_tile":
-                            logger.warning("[WS] Blocked disallowed live tool call: create_text_tile")
-                            continue
+                        for fc in func_calls:
+                            tool_call_key, tool_call_id = build_tool_call_key(fc, turn_id)
+                            if tool_call_key in processed_tool_call_keys:
+                                logger.info("[WS] Skipping duplicate tool_call event: %s", tool_call_key)
+                                continue
+                            processed_tool_call_keys.add(tool_call_key)
+                            if len(processed_tool_call_keys) > 4000:
+                                processed_tool_call_keys.clear()
 
-                        tool_call_key, tool_call_id = build_tool_call_key(fc, turn_id)
-                        if tool_call_key in processed_tool_call_keys:
-                            logger.info("[WS] Skipping duplicate tool_call event: %s", tool_call_key)
-                            continue
-                        processed_tool_call_keys.add(tool_call_key)
-                        if len(processed_tool_call_keys) > 4000:
-                            processed_tool_call_keys.clear()
+                            logger.info("[WS] Agent tool call: %s", fc.name)
+                            log.append(f"Called tool: {fc.name}")
+                            
+                            if fc.name == "modify_dashboard":
+                                logger.info("[WS] modify_dashboard args: %s", str(fc.args)[:800])
 
-                        logger.info("[WS] Agent tool call: %s", fc.name)
-                        log.append(f"Called tool: {fc.name}")
-                        if fc.name == "modify_dashboard":
-                            logger.info("[WS] modify_dashboard args: %s", str(fc.args)[:800])
+                            if fc.name == "execute_bigquery":
+                                last_sql_info["sql"] = fc.args.get("sql")
+                                last_sql_info["provider"] = "bigquery"
+                            elif fc.name == "execute_sql":
+                                last_sql_info["sql"] = fc.args.get("sql")
+                                last_sql_info["provider"] = "databricks"
 
-                        if fc.name == "execute_bigquery":
-                            last_sql_info["sql"] = fc.args.get("sql")
-                            last_sql_info["provider"] = "bigquery"
-                        elif fc.name == "execute_sql":
-                            last_sql_info["sql"] = fc.args.get("sql")
-                            last_sql_info["provider"] = "databricks"
+                            await send_turn_state("tool_start", turn_id, fc.name)
 
-                        await send_turn_state("tool_start", turn_id, fc.name)
-
-                        payload: dict[str, Any] = {
-                            "type": "tool_call",
-                            "name": fc.name,
-                            "args": fc.args,
-                            "turn_id": turn_id,
-                            "tool_call_key": tool_call_key,
-                        }
-                        if tool_call_id:
-                            payload["tool_call_id"] = tool_call_id
-                        if fc.name in ("create_visualization", "create_data_table", "create_kpi_tile") and last_sql_info["sql"]:
-                            from src.api.routes_charts import detect_sql_params
-
-                            payload["query_meta"] = {
-                                "sql": last_sql_info["sql"],
-                                "params": detect_sql_params(last_sql_info["sql"]),
-                                "type": last_sql_info["provider"],
+                            payload: dict[str, Any] = {
+                                "type": "tool_call",
+                                "name": fc.name,
+                                "args": fc.args,
+                                "turn_id": turn_id,
+                                "tool_call_key": tool_call_key,
                             }
+                            if tool_call_id:
+                                payload["tool_call_id"] = tool_call_id
+                            if fc.name in ("create_visualization", "create_data_table", "create_kpi_tile") and last_sql_info["sql"]:
+                                from src.api.routes_charts import detect_sql_params
 
-                        await send_json_safe(payload)
-                        await send_turn_state("tool_end", turn_id, fc.name)
+                                payload["query_meta"] = {
+                                    "sql": last_sql_info["sql"],
+                                    "params": detect_sql_params(last_sql_info["sql"]),
+                                    "type": last_sql_info["provider"],
+                                }
+
+                            await send_json_safe(payload)
+                            await send_turn_state("tool_end", turn_id, fc.name)
 
             except (WebSocketDisconnect, RuntimeError):
                 logger.info("[WS] Client disconnected during event handling.")
