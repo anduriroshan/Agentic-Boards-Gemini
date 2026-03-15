@@ -28,6 +28,18 @@ Powered by the **Google Agent Development Kit (ADK)** for real-time interaction 
 
 ---
 
+## Key Features
+
+- **Multimodal Live Agent:** Talk to your data. Use voice and audio for a low-latency, "always-on" analytical companion.
+- **Dynamic Chart Authoring:** Agents generate Vega-Lite specifications on-demand, giving them precise control over axes, colors, and transformations.
+- **Interactive Dashboards:** Drag-and-drop grid. Resize, move, or remove tiles.
+- **Auto-Refresh & Live Data:** Charts can be configured to refresh automatically, ensuring your insights are always up to date.
+- **Metric KPI Tiles:** Beyond charts, the system generates KPI cards with Sparklines and thresholds for tracking core business metrics.
+- **AI Insights & Summaries:** Agents reason over existing dashboard states to provide summaries and meta-analysis without re-querying.
+- **Universal Chat Interface:** A single, unified interface for data discovery, query execution, and visual refactoring.
+
+---
+
 ## How it Works
 
 The system uses a multi-layered agent architecture to handle the lifecycle of data analysis:
