@@ -357,41 +357,6 @@ http://localhost:5173
 
 The frontend automatically proxies API calls to `http://localhost:8000`.
 
----
-
-## Project Structure
-
-```
-Agentic-Boards-Gemini/
-├── backend/                    # Python FastAPI server
-│   ├── src/
-│   │   ├── main.py            # API entry point
-│   │   ├── config.py          # Settings (reads from .env)
-│   │   ├── agent/             # LLM agent orchestration
-│   │   ├── api/               # REST API routes
-│   │   ├── databricks/        # Databricks connection & query
-│   │   ├── metadata/          # Schema caching & vector search
-│   │   └── ...
-│   ├── pyproject.toml         # Python dependencies
-│   └── .env                   # Configuration (you create this)
-│
-├── frontend/                   # React TypeScript app
-│   ├── src/
-│   │   ├── main.tsx           # App entry point
-│   │   ├── App.tsx            # Main component
-│   │   ├── components/        # UI components
-│   │   ├── stores/            # Zustand state management
-│   │   └── ...
-│   ├── package.json           # JS dependencies
-│   └── vite.config.ts         # Build configuration
-│
-├── docker-compose.yml         # Multi-container orchestration
-├── .env.example               # Template for configuration
-└── README.md                  # This file
-```
-
----
-
 ## Troubleshooting
 
 ### "Authentication Failed" or "401 Unauthorized"
@@ -506,14 +471,24 @@ docker compose up --build
 
 ### Everything Works but No Data Shows Up
 
-**Cause:** Your Databricks warehouse has no tables, or the default table isn't configured.
+**Cause:** Your data warehouse (Databricks or BigQuery) has no tables, or the connection isn't configured.
 
-**Fix:**
+**For Databricks:**
 1. Log into your Databricks workspace
 2. Click **Catalog** → check if you have tables
-3. Pick a table name and update `DATABRICKS_DEFAULT_TABLE` in `backend/.env`
-4. Example: `DATABRICKS_DEFAULT_TABLE=main.default.my_table_name`
-5. Restart the app
+3. If you have tables, pick a table name and update `DATABRICKS_DEFAULT_TABLE` in `backend/.env`
+   - Example: `DATABRICKS_DEFAULT_TABLE=main.default.my_table_name`
+4. Make sure your SQL Warehouse is powered on
+5. Restart the app: `docker compose down && docker compose up --build`
+
+**For BigQuery:**
+1. Log into [Google Cloud Console](https://console.cloud.google.com/)
+2. Go to **BigQuery** and create a dataset or load sample data into an existing dataset
+3. Update your `backend/.env` with:
+   - `BIGQUERY_PROJECT_ID=<your-gcp-project-id>`
+   - `BIGQUERY_DATASET=<your-dataset-name>`
+4. Make sure your service account has `Big Query Admin` role (you already did this in Step 3 of setup)
+5. Restart the app: `docker compose down && docker compose up --build`
 
 ---
 
