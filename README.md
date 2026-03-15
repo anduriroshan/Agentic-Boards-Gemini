@@ -1,77 +1,41 @@
-# Agentic Boards - Conversational Business Intelligence
+<div align="center">
+   <h1><strong>Agentic Boards</strong></h1>
 
-Conversational BI Platform for Enterprise Data Analytics  
-**Live Demo:** [agentic-boards.live](https://agentic-boards.live)
+   <p>
+      An AI-Native Workspace for Collaborative Data Dashboards<br />
+      <strong>Live:</strong> <a href="https://agentic-boards.live">agentic-boards.live</a> (Beta)
+   </p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![React 19](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Agent%20Orchestration-1f3937.svg)](https://github.com/langchain-ai/langgraph)
-[![LangChain](https://img.shields.io/badge/LangChain-Framework-2ea44f.svg)](https://www.langchain.com/)
-[![Google ADK](https://img.shields.io/badge/Google%20ADK-Agent%20Dev%20Kit-4285F4.svg)](https://github.com/google/generative-ai-python)
+   <p>
+      <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/></a>
+      <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python 3.11+"/></a>
+      <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-61dafb.svg" alt="React 19"/></a>
+      <a href="https://github.com/langchain-ai/langgraph"><img src="https://img.shields.io/badge/LangGraph-Agent%20Orchestration-1f3937.svg" alt="LangGraph"/></a>
+      <a href="https://www.langchain.com/"><img src="https://img.shields.io/badge/LangChain-Framework-2ea44f.svg" alt="LangChain"/></a>
+      <a href="https://github.com/google/generative-ai-python"><img src="https://img.shields.io/badge/Google%20ADK-Agent%20Dev%20Kit-4285F4.svg" alt="Google ADK"/></a>
+   </p>
+</div>
 
-**[Website](https://agentic-boards.live) • [Documentation](#getting-started) • [Report Issue](https://github.com) • [Contribute](https://github.com)**
 
----
-
-**Agentic Boards** is a conversational Business Intelligence platform that generates interactive dashboards from natural language queries. Instead of navigating static dashboards, users ask questions in plain English and the system finds data, writes SQL, executes queries, and creates visualizations in real-time.
-
-Built with the Google Agent Development Kit (ADK), LangGraph ReAct agents, and Gemini Live API, Agentic Boards searches your Databricks and BigQuery schemas using semantic embeddings (Milvus). It generates SQL queries, executes them, and streams the agent's reasoning and results to your browser so you can see every step.
-
----
-
-## Features
-
-### Natural Language Analytics
-Ask questions in plain English like "Show me top 10 products by sales in May as a donut chart." The system discovers relevant tables via semantic search, generates SQL, executes queries, and creates interactive visualizations. 
-
-### AI-Powered Dashboard Generation
-Every chart, table, and layout is generated on-demand by AI agents. The system chooses visualization types (bar, line, pie, scatter), encodes data dimensions, and responds to your queries in real-time.
-
-### Real-Time Agent Transparency
-Watch AI agents think in real-time via WebSocket streaming. The **Agent Activity Panel** shows every step: which tables are being searched, what SQL is being generated, which tools are executing, and how data is being transformed into visualizations.
-
-### Multi-Tenant Workspaces
-Google OAuth 2.0 enables secure multi-user access, with each user maintaining isolated dashboards, chat history, and session state. Role-based data access through your warehouse security policies.
-
-### Persistent Analysis & History
-All dashboards, charts, and conversations are persisted in a backend database, not temporary browser storage. Your analytical work follows you across devices and browsers, with full chat history and dashboard snapshots available for reference.
 
 ---
 
-## Dashboard Capabilities
+**Agentic Boards** is an AI-powered workspace for building data dashboards through collaboration with autonomous agents. Inspired by modern agentic IDEs, it moves from natural language intent to live visualizations in a single, iterative loop.
 
-The Agentic Boards dashboard combines AI-driven generation with manual control:
+Instead of manual drag-and-drop, agents navigate your warehouse schemas (BigQuery/Databricks), generate SQL, and render charts as declarative code. This allows for a fast "co-authoring" experience where you can build and refactor insights through simple conversation.
 
-- **Responsive Grid Layout:** 12-column drag-and-drop grid similar to Notion/Excel for organizing insights
-- **Visualizations:** Bar, line, area, pie, scatter, and more automatically chosen based on your data
-- **Interactive Data Tables:** Column formatting, null/NaN handling, pageable results
-- **KPI Cards:** Metric tiles with spark lines and thresholds
-- **AI-Driven Editing:** Modify tiles with natural language commands like "Add a bar graph showing top products by revenue" or "Change the color of this card"
-- **Contextual AI Reasoning:** Agents analyze existing tiles to answer questions without re-querying
-- **Multi-Warehouse Context:** Query Databricks and BigQuery in the same session with automatic provider switching
+Powered by the **Google Agent Development Kit (ADK)** for real-time interaction and **LangGraph** for structured reasoning.
 
 ---
 
-## The Agent System
+## How it Works
 
-Agentic Boards uses a multi-layered agent architecture combining the Google Agent Development Kit (ADK) with LangGraph ReAct agents. The system supports both real-time streaming (via Gemini Live API) and traditional ReAct orchestration, with semantic schema discovery via Milvus vector embeddings.
+The system uses a multi-layered agent architecture to handle the lifecycle of data analysis:
 
-### DataAgent
-Responsible for finding and querying enterprise data.
-* **Capabilities:** Searches Databricks and BigQuery schemas using semantic + keyword search (via Milvus embeddings), discovers relevant tables and columns, generates dialect-specific SQL, validates queries for safety (read-only enforcement), and executes with automatic provider switching.
-
-### VizAgent
-Transforms raw data into interactive visual insights.
-* **Capabilities:** Analyzes data shapes to select visualization types (bar, line, area, pie, scatter, table), encodes data dimensions, generates Vega-Lite specifications and interactive React tables, handles null/NaN/Infinity values, and creates KPI metric cards.
-
-### DashboardAgent
-Manages spatial layout and presentation of insights.
-* **Capabilities:** Modifies dashboard tiles based on natural language ("Make this wider", "Move to top"), updates chart specs/colors/titles, repositions/resizes tiles on the 12-column grid, manages layout state, and removes components on command.
-
-### Orchestrator Agent
-Coordinates high-level analysis and meta-reasoning.
-* **Capabilities:** Answers questions about previous actions ("What have you done?"), accesses session history and dashboard snapshots, reasons over existing tiles without re-querying, and manages multi-step workflows.
+- **Data Discovery:** Agents search your enterprise schemas (BigQuery/Databricks) using semantic search to find the right tables for your questions.
+- **Visualization Engine:** Once data is retrieved, agents select the best chart type and author the Vega-Lite code to render it.
+- **Layout Management:** Agents can move, resize, or update existing tiles on a 12-column grid based on your commands.
+- **Context Awareness:** The system maintains a "snapshot" of your current dashboard, allowing agents to reason about existing charts without re-querying.
 
 ---
 
