@@ -300,18 +300,23 @@ const LiveAgent: React.FC = () => {
         layout: t.layout,
         ...(t.type === "chart"
           ? {
-            vegaSpec: {
+            vegaSpec: t.vegaSpec ? {
               ...t.vegaSpec,
-              data: t.vegaSpec?.data ? { ...t.vegaSpec.data, values: undefined } : undefined,
-            },
+              // Send up to 20 rows of chart data as a sample
+              data: (t.vegaSpec.data as any)?.values 
+                ? { ...t.vegaSpec.data, values: (t.vegaSpec.data as any).values.slice(0, 20) } 
+                : t.vegaSpec.data,
+            } : undefined,
           }
           : {}),
-        ...(t.type === "kpi" ? { kpiData: t.kpiData } : {}),
+        ...(t.type === "kpi" ? { kpiData: t.kpiData, value: t.kpiData?.value } : {}),
         ...(t.type === "table"
           ? {
             column_count: t.tableData?.columns?.length || 0,
             row_count: t.tableData?.rows?.length || 0,
             columns: t.tableData?.columns?.map((c) => c.headerName || c.field),
+            // Send up to 20 rows of table data as a sample
+            rows: t.tableData?.rows?.slice(0, 20) || [],
           }
           : {}),
         ...(t.type === "text" ? { markdown: t.textData?.markdown } : {}),
