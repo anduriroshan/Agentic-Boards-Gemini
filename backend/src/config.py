@@ -90,10 +90,19 @@ settings = Settings()
 if settings.gcp_project_id:
     os.environ["GOOGLE_CLOUD_PROJECT"] = settings.gcp_project_id
     os.environ["GOOGLE_CLOUD_LOCATION"] = settings.gcp_region
-    # Force the service account path if it exists
-    sa_path = os.path.join(os.getcwd(), "service_account.json")
-    if os.path.exists(sa_path):
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = sa_path
+    # Only set GOOGLE_APPLICATION_CREDENTIALS if a file actually exists at that path
+    # This prevents Cloud Run from crashing when it's looking for local files
+    sa_path = settings.google_application_credentials
+    if sa_path:
+        # Resolve absolute path if relative
+        if not os.path.isabs(sa_path):
+            sa_path = os.path.join(os.getcwd(), sa_path)
+        
+        if os.path.exists(sa_path):
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = sa_path
+            logging.getLogger(__name__).info(f"Using service account key: {sa_path}")
+        else:
+            logging.getLogger(__name__).warning(f"Credential file NOT found at {sa_path}. Falling back to ADC.")
 
 # Remove API keys to prevent SDKs from falling back to Gemini API (AI Studio)
 # which causes authentication conflicts with Vertex AI.

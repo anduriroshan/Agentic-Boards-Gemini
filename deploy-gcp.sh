@@ -9,7 +9,8 @@ SERVICE_NAME="agentic-boards"
 # 1. Parse backend/.env into gcloud format
 echo "📝 Parsing environment variables from backend/.env..."
 # More robust parsing: ignore comments/empty lines, handle quotes, join with commas
-ENV_VARS=$(grep -v '^#' backend/.env | grep -v '^$' | grep '=' | sed 's/"//g' | sed "s/'//g" | paste -sd "," -)
+# ALSO: filter out GOOGLE_APPLICATION_CREDENTIALS so Cloud Run uses its default ADC
+ENV_VARS=$(grep -v '^#' backend/.env | grep -v '^$' | grep '=' | grep -v 'GOOGLE_APPLICATION_CREDENTIALS' | sed 's/"//g' | sed "s/'//g" | paste -sd "," -)
 
 # Load specifically for script use (Cloudflare/Domain)
 source <(grep -E '^(CLOUDFLARE|DOMAIN_NAME)' backend/.env | sed 's/"//g' | sed "s/'//g" || true)

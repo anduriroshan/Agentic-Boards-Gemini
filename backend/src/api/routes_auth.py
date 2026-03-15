@@ -52,9 +52,16 @@ async def login_google(request: Request):
     if not oauth.google.client_id:
         raise HTTPException(status_code=500, detail="Google OAuth is not configured. Missing client ID.")
     
-    # It MUST exactly match your Authorized redirect URIs in GCP.
-    # We now use a setting so you can easily switch to agnetic-boards.live
-    redirect_uri = settings.google_redirect_uri or "http://localhost:8000/api/auth/google/callback"
+    # Dynamically determine redirect URI based on how the user is accessing the site
+    # request.base_url will correctly reflect the domain (either .run.app or .live)
+    base_url = str(request.base_url).rstrip("/")
+    
+    # Ensure HTTPS for production URLs
+    if "localhost" not in base_url and "127.0.0.1" not in base_url:
+        base_url = base_url.replace("http://", "https://")
+        
+    redirect_uri = f"{base_url}/api/auth/google/callback"
+    logger.info(f"Initiating Google login with redirect_uri: {redirect_uri}")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
@@ -99,8 +106,17 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
     # Issue Session Token
     token = create_session_for_user(db, user)
 
-    # We want to redirect back to the Frontend and give it the token
-    frontend_url = settings.frontend_url or "http://localhost:8001"
+    # Dynamically determine where to redirect back to
+    base_url = str(request.base_url).rstrip("/")
+    if "localhost" not in base_url and "127.0.0.1" not in base_url:
+        base_url = base_url.replace("http://", "https://")
+    
+    # On localhost, frontend might be on a different port (8001)
+    if "localhost" in base_url or "127.0.0.1" in base_url:
+        frontend_url = settings.frontend_url or "http://localhost:8001"
+    else:
+        frontend_url = base_url
+
     response = RedirectResponse(url=frontend_url)
     
     # Determine if we are running on localhost for cookie flags
