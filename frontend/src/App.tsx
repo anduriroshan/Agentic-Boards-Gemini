@@ -1,6 +1,8 @@
 import AppShell from "@/components/layout/AppShell";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Login from "@/components/auth/Login";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import Toaster from "@/components/Toast";
 
 const AppContent = () => {
   const { user, isLoading } = useAuth();
@@ -22,8 +24,11 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+        <Toaster />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

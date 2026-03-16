@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Message } from "@/types/chat";
 import { sendChatMessage } from "@/lib/api";
 import { useAgentStore } from "@/stores/agentStore";
+import { useToastStore } from "@/stores/toastStore";
 
 export interface SessionRecord {
   id: string;
@@ -92,6 +93,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     } catch (e) {
       console.error("Failed to fetch models", e);
+      useToastStore.getState().addToast("error", "Failed to fetch available models");
     }
   },
 

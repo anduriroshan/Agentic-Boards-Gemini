@@ -26,6 +26,20 @@ interface DatabricksState {
   clearError: () => void;
 }
 
+let activePollInterval: ReturnType<typeof setInterval> | null = null;
+let activePollTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function clearPolling() {
+  if (activePollInterval) {
+    clearInterval(activePollInterval);
+    activePollInterval = null;
+  }
+  if (activePollTimeout) {
+    clearTimeout(activePollTimeout);
+    activePollTimeout = null;
+  }
+}
+
 export const useDatabricksStore = create<DatabricksState>((set) => ({
   status: null,
   tables: [],
@@ -44,16 +58,17 @@ export const useDatabricksStore = create<DatabricksState>((set) => ({
   },
 
   connect: async () => {
+    clearPolling();
     set({ loading: true, error: null });
     try {
       await connectDatabricks();
       // Start polling for connection completion
-      const poll = setInterval(async () => {
+      activePollInterval = setInterval(async () => {
         try {
           const status = await getDatabricksStatus();
           set({ status });
           if (status.connected || !status.connecting) {
-            clearInterval(poll);
+            clearPolling();
             set({ loading: false });
           }
         } catch {
@@ -61,8 +76,8 @@ export const useDatabricksStore = create<DatabricksState>((set) => ({
         }
       }, 5000);
       // Safety: stop polling after 5 min
-      setTimeout(() => {
-        clearInterval(poll);
+      activePollTimeout = setTimeout(() => {
+        clearPolling();
         set({ loading: false });
       }, 300_000);
     } catch (err) {
@@ -71,6 +86,7 @@ export const useDatabricksStore = create<DatabricksState>((set) => ({
   },
 
   disconnect: async () => {
+    clearPolling();
     set({ loading: true, error: null });
     try {
       await disconnectDatabricks();

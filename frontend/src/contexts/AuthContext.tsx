@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useToastStore } from '@/stores/toastStore';
 
 export interface User {
     id: number;
@@ -36,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         } catch (error) {
             console.error('Failed to fetch user:', error);
+            useToastStore.getState().addToast('error', 'Failed to check authentication');
             setUser(null);
         } finally {
             setIsLoading(false);
@@ -51,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await fetch('/api/auth/logout', { method: 'POST' });
         } catch (error) {
             console.error('Logout failed:', error);
+            useToastStore.getState().addToast('error', 'Logout failed');
         } finally {
             setUser(null);
             // Optional: Redirect to login or home

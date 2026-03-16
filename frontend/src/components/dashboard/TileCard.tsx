@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useDashboardStore } from "@/stores/dashboardStore";
 import { useFilterStore } from "@/stores/filterStore";
+import { useToastStore } from "@/stores/toastStore";
 import { refreshChartData } from "@/lib/api";
 import VegaChart from "./VegaChart";
 import DataTable from "./DataTable";
@@ -144,6 +145,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
         }
       } catch (err) {
         console.error("Tile refresh failed:", err);
+        useToastStore.getState().addToast("error", `Tile refresh failed: ${err instanceof Error ? err.message : "Unknown error"}`);
       } finally {
         setIsRefreshing(false);
       }
@@ -223,6 +225,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
             }}
             className="text-base px-1 text-foreground hover:text-primary transition-colors"
             title={showHeaderActions ? "Collapse tile controls" : "Expand tile controls"}
+            aria-label={showHeaderActions ? "Collapse tile controls" : "Expand tile controls"}
           >
             {showHeaderActions ? "<" : ">"}
           </button>
@@ -237,6 +240,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
                   }}
                   className="text-sm px-1 text-muted-foreground hover:text-foreground transition-colors"
                   title="Bring Forward"
+                  aria-label="Bring Forward"
                 >
                   ↑
                 </button>
@@ -250,6 +254,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
                   }}
                   className="text-sm px-1 text-muted-foreground hover:text-foreground transition-colors"
                   title="Send Backward"
+                  aria-label="Send Backward"
                 >
                   ↓
                 </button>
@@ -263,6 +268,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
                 className={`text-sm px-1 transition-colors relative ${showComments ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   }`}
                 title="Comments"
+                aria-label="Comments"
               >
                 💬
                 {(tile.comments?.length ?? 0) > 0 && (
@@ -287,6 +293,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
                     : "text-muted-foreground hover:text-foreground"
                     }`}
                   title="Chart Parameters"
+                  aria-label="Chart Parameters"
                 >
                   ⚙
                 </button>
@@ -301,6 +308,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
                 className={`text-sm px-1 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors ${isRefreshing ? "animate-spin" : ""
                   }`}
                 title="Refresh Data"
+                aria-label="Refresh Data"
               >
                 ↻
               </button>
@@ -313,6 +321,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
                   }}
                   className={`text-sm px-1 transition-colors ${showKpiSettings ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
                   title="KPI Text Size"
+                  aria-label="KPI Text Size"
                 >
                   A
                 </button>
@@ -337,6 +346,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
               className={`text-sm px-1 transition-colors ${showTextSettings ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
               title="Text Settings"
+              aria-label="Text Settings"
             >
               ⚙
             </button>
@@ -350,6 +360,7 @@ export default function TileCard({ tile, onBringToFront, onSendToBack }: TileCar
               }}
               className="text-muted-foreground hover:text-destructive text-sm px-1 ml-1 z-10"
               title="Remove tile"
+              aria-label="Remove tile"
             >
               &times;
             </button>
