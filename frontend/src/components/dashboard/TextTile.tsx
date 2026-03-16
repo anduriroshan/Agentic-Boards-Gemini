@@ -1,38 +1,7 @@
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import { type TextData } from "@/types/dashboard";
-
-// Very minimal inline markdown parser for simple bold/italic/links/headings/lists
-function parseMarkdown(text: string) {
-    let html = text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-
-    // Headings
-    html = html.replace(/^### (.*$)/gim, '<h3 class="text-lg font-bold mt-3 mb-1">$1</h3>');
-    html = html.replace(/^## (.*$)/gim, '<h2 class="text-xl font-bold mt-4 mb-2">$1</h2>');
-    html = html.replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold mt-5 mb-3">$1</h1>');
-
-    // Bold and Italic
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-    // Code
-    html = html.replace(/`(.*?)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-sm font-mono text-primary">$1</code>');
-
-    // Blockquotes
-    html = html.replace(/^> (.*$)/gim, '<blockquote class="border-l-4 border-primary/50 pl-4 py-1 my-2 text-muted-foreground italic">$1</blockquote>');
-
-    // Bullet Lists
-    html = html.replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc marker:text-primary">$1</li>');
-    html = html.replace(/^- (.*$)/gim, '<li class="ml-4 list-disc marker:text-primary">$1</li>');
-
-    // Line breaks
-    html = html.replace(/\n\n/g, '<br/><br/>');
-    html = html.replace(/\n(?!(<\/li>|<\/h|<br|\s*$))/g, '<br/>');
-
-    return { __html: html };
-}
 
 interface TextTileProps {
     data: TextData;
@@ -101,7 +70,11 @@ export default function TextTile({ data, onUpdate }: TextTileProps) {
             onClick={() => setIsEditing(true)}
         >
             {data.markdown ? (
-                <div dangerouslySetInnerHTML={parseMarkdown(data.markdown)} />
+                <div className="prose prose-sm prose-headings:font-bold prose-h1:text-2xl prose-h1:mt-5 prose-h1:mb-3 prose-h2:text-xl prose-h2:mt-4 prose-h2:mb-2 prose-h3:text-lg prose-h3:mt-3 prose-h3:mb-1 prose-strong:font-bold prose-em:italic prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:text-primary prose-blockquote:border-l-4 prose-blockquote:border-primary/50 prose-blockquote:pl-4 prose-blockquote:py-1 prose-blockquote:my-2 prose-blockquote:text-muted-foreground prose-blockquote:italic prose-li:ml-4 prose-li:list-disc max-w-none">
+                    <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+                        {data.markdown}
+                    </ReactMarkdown>
+                </div>
             ) : (
                 <div className="h-full w-full flex items-center justify-center text-muted-foreground italic opacity-50">
                     Empty notes—click to edit
