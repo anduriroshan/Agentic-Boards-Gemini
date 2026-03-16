@@ -46,8 +46,95 @@ The system uses a multi-layered agent architecture to handle the lifecycle of da
 
 - **Data Discovery:** Agents search your enterprise schemas (BigQuery/Databricks) using semantic search to find the right tables for your questions.
 - **Visualization Engine:** Once data is retrieved, agents select the best chart type and author the Vega-Lite code to render it.
-- **Layout Management:** Agents can move, resize, or update existing tiles on a 12-column grid based on your commands.
+- **Layout Management:** Agents can update existing tiles on a 12-column grid based on your commands like colors/title changes, data refresh, query changes, etc.
 - **Context Awareness:** The system maintains a "snapshot" of your current dashboard, allowing agents to reason about existing charts without re-querying.
+
+---
+
+## How I Built It
+
+### Dual-Agent Architecture
+
+Agentic Boards runs **two separate agents** under the hood, both sharing the same 14 tool definitions:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        AGENTIC BOARDS                           │
+├───────────────────────────┬─────────────────────────────────────┤
+│     Text Chat (LangGraph) │     Voice / Live (Google ADK)       │
+│                           │                                     │
+│  guardrail_node           │  adk.Runner.run_live()              │
+│      ↓                    │      ↑ PCM audio (16kHz)            │
+│  agent_node  ←──────┐     │      ↓ PCM audio (24kHz)            │
+│      ↓              │     │  get_adk_agent()                    │
+│  ToolNode ──────────┘     │      ↓                              │
+│      ↓                    │  WebSocket /agent/live              │
+│  SSE response             │      ↓ tool_call events (JSON)      │
+└───────────────────────────┴─────────────────────────────────────┘
+                          ↓ Shared Tools ↓
+   search_metadata · execute_sql · execute_bigquery · create_visualization
+   create_kpi_tile · create_data_table · modify_dashboard · remove_tiles
+   get_dashboard_snapshot · get_tile_data · get_recent_activity · ...
+                          ↓ Shared Data Layer ↓
+            Milvus Lite (semantic schema search, text-embedding-004)
+            Databricks SQL Warehouse  ·  Google BigQuery
+            SQLite (sessions, users, chat history, dashboards)
+```
+
+### Text Chat Flow (LangGraph ReAct)
+
+1. User message hits `POST /api/chat` (FastAPI)
+2. **Guardrail node** classifies intent as `IN_SCOPE` / `OUT_OF_SCOPE` using a fast Gemini call
+3. **Agent node** — Gemini 2.0 Flash with all tools bound; generates tool calls
+4. **ToolNode** executes the tool, returns result; loops back to agent
+5. Final answer streams back to the browser via **Server-Sent Events (SSE)**
+6. Frontend intercepts `tool_call` events and mutates the React dashboard state
+
+### Live Voice Flow (Google ADK)
+
+1. Browser opens `WebSocket /agent/live`
+2. Frontend sends a `context_update` message with current tile state + active provider
+3. Backend initialises `get_adk_agent(bootstrap_context)` with the snapshot baked into the system prompt
+4. `adk.Runner.run_live()` starts; browser streams raw **PCM audio (16kHz)** as binary frames
+5. ADK model reasons over audio → emits tool calls + **PCM audio response (24kHz)**
+6. Backend forwards tool call events as JSON over the same WebSocket → dashboard updates live
+7. Backend forwards audio bytes → browser decodes via **Web Audio API** → user hears the agent
+
+### Semantic Schema Discovery (Milvus + Vertex AI Embeddings)
+
+Instead of hardcoding table names, schema knowledge is built dynamically:
+
+1. A background indexer crawls your Databricks/BigQuery warehouse (`information_schema`)
+2. Tables, columns, data types, sample categorical values, and auto-generated analysis guides are embedded with **[`text-embedding-004`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/text-embeddings)** (768-dim)
+3. Vectors are stored in **Milvus Lite** (an embedded SQLite-backed vector DB; no server needed)
+4. At query time, `search_metadata(query)` embeds the natural language question and retrieves the top-K hits via **COSINE similarity**
+5. Column-level hits are grouped back into per-table metadata objects (measures, dimensions, categorical values) and returned to the agent
+
+### Visualization Pipeline
+
+Every chart is a **complete Vega-Lite v5 JSON specification** authored by the agent and stored with the tile:
+
+```
+User asks → search_metadata → execute_sql / execute_bigquery
+    → create_visualization({vega_lite_spec: "...complete JSON..."})
+    → tile stored in React state with tile_id, layout, vega_spec, query_meta
+    → react-vega renders it → auto-refresh re-runs stored SQL on interval
+```
+
+The `modify_dashboard` tool can surgically update just the spec, just the layout, or just the title; without touching the rest of the tile.
+
+### Key Engineering Details
+
+| Problem | Solution |
+|---|---|
+| 32K context limit in Live API | `summarize_tool_output()`; samples first 15 rows, tells model full data is in UI |
+| Duplicate tool events from ADK | SHA-1 dedup on `(turn_id + tool_name + args)` per session |
+| Agent calling tools on context sync | `has_user_audio` gate — model only gets context after first user speech |
+| LLM describing chart instead of drawing it | `_needs_visualization_nudge()` — detects SQL-without-viz and re-invokes with a hard instruction |
+| Milvus path errors on Cloud Run | Always resolve to absolute `Path` at client init; `mkdir(parents=True)` |
+| Cross-provider SQL confusion | Provider-hint detection filters all Milvus results by `bigquery` or `databricks` |
+| All-zero SQL results | Data quality guard warns the agent to re-query a different time window |
+| LLM-malformed JSON from tool args | `_parse_llm_json()` falls back to `raw_decode` to extract first valid JSON object |
 
 ---
 
@@ -66,6 +153,38 @@ The system uses a multi-layered agent architecture to handle the lifecycle of da
 | **Visualization** | Vega-Lite, Interactive Tables, KPI Cards |
 
 ---
+
+---
+
+## ⚡ Quick Start for Judges
+
+The fastest way to verify the project is reproducible:
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/anduriroshan/Agentic-Boards-Gemini.git
+cd Agentic-Boards-Gemini
+
+# 2. Copy and fill in the environment config
+cp .env.example backend/.env
+# Edit backend/.env — you need:
+#   GCP_PROJECT_ID, GCP_REGION, GCP_SERVICE_ACCOUNT (path to service_account.json)
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (Google OAuth app)
+#   DATABRICKS_HOST, DATABRICKS_TOKEN, DATABRICKS_HTTP_PATH  (or BigQuery credentials)
+# Full credential setup guide is in the Prerequisites section below (~15 min)
+
+# 3. Place your GCP service account key
+mv ~/Downloads/your-service-account.json backend/service_account.json
+
+# 4. Build and run (takes ~3 min on first run)
+docker compose up --build
+```
+
+Open **http://localhost:8001** → sign in with Google → start chatting with your data.
+
+The Live Voice agent is at the microphone icon in the top-right corner of any session.
+
+> **Demo without your own warehouse:** The hosted version at [agentic-boards.live](https://agentic-boards.live) runs against the public Iowa Liquor Sales dataset on BigQuery. No credentials needed to try it — just sign in with Google.
 
 ---
 
