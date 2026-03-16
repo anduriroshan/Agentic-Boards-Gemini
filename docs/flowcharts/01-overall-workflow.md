@@ -1,135 +1,50 @@
 # Overall System Workflow
 
-High-level architecture showing how all components connect.
-
 ```mermaid
 flowchart TB
-    subgraph Browser["Browser (React 19 + TypeScript)"]
-        Login["Login Page"]
-        AppShell["AppShell (3-Panel Layout)"]
-
-        subgraph Panels["Resizable Panels"]
-            Activity["Agent Activity Panel"]
-            Dashboard["Dashboard Canvas"]
-            Chat["Chat Panel"]
-        end
-
-        subgraph Stores["Zustand State Stores"]
-            ChatStore["chatStore"]
-            DashStore["dashboardStore"]
-            AgentStore["agentStore"]
-            SessionStore["sessionStore"]
-            FilterStore["filterStore"]
-        end
+    subgraph Browser["Frontend (React 19 + TypeScript)"]
+        Chat["Chat Panel<br/>(Text & Voice Input)"]
+        Dashboard["Dashboard Canvas<br/>(Drag-Drop Grid)"]
+        Activity["Agent Activity<br/>(Real-Time Steps)"]
+        Stores["Zustand Stores<br/>(chat, dashboard, agent)"]
     end
 
-    subgraph FastAPI["FastAPI Backend (Python)"]
-        AuthRoutes["/auth/* Routes"]
-        ChatRoute["/api/chat (SSE)"]
-        LiveRoute["/api/agent/live (WebSocket)"]
-        DatabricksRoutes["/databricks/* Routes"]
-        BigQueryRoutes["/bigquery/* Routes"]
-        WorkspaceRoutes["/workspace/* Routes"]
+    subgraph Backend["Backend (FastAPI + Python)"]
+        Auth["Google OAuth 2.0<br/>Session Management"]
+        ChatAPI["POST /api/chat<br/>(SSE Streaming)"]
+        LiveAPI["WS /api/agent/live<br/>(Voice + WebSocket)"]
     end
 
-    subgraph AgentLayer["AI Agent Layer"]
+    subgraph Agent["AI Agent Layer"]
+        Guardrail["Guardrail<br/>(Scope Check)"]
         LangGraph["LangGraph ReAct Agent"]
-        ADKAgent["Google ADK Agent<br/>(Multimodal Live)"]
-        Guardrail["Guardrail Node"]
-        ToolNode["Tool Node"]
+        ADK["Google ADK Agent<br/>(Multimodal Live)"]
+        Tools["Agent Tools<br/>(search, query, visualize,<br/>modify, remove)"]
     end
 
-    subgraph Tools["Agent Tools"]
-        SearchMeta["search_metadata"]
-        ExecSQL["execute_sql"]
-        ExecBQ["execute_bigquery"]
-        CreateViz["create_visualization"]
-        CreateKPI["create_kpi_tile"]
-        CreateTable["create_data_table"]
-        ModifyDash["modify_dashboard"]
-        RemoveTiles["remove_tiles"]
-        CreateText["create_text_tile"]
-        GetSchema["get_bigquery_schema"]
-        GetTileData["get_tile_data"]
-    end
-
-    subgraph DataLayer["Data & Storage Layer"]
-        Databricks["Databricks<br/>(SQL Warehouse / Spark)"]
+    subgraph Data["Data & Storage"]
+        Databricks["Databricks<br/>(SQL Warehouse)"]
         BigQuery["Google BigQuery"]
-        Milvus["Milvus Vector DB<br/>(Schema Embeddings)"]
-        SQLite["SQLite<br/>(Users, Sessions, Workspaces)"]
+        Milvus["Milvus Vector DB<br/>(Schema Search)"]
+        SQLite["SQLite<br/>(Users & Sessions)"]
     end
 
-    subgraph LLM["LLM Providers"]
-        Gemini["Google Gemini<br/>(Vertex AI / API Key)"]
-        OpenAI["OpenAI API"]
+    subgraph LLM["LLM"]
+        Gemini["Google Gemini<br/>(Vertex AI / API)"]
     end
 
-    subgraph Auth["Authentication"]
-        GoogleOAuth["Google OAuth 2.0"]
-    end
+    Chat -->|"Text messages"| ChatAPI
+    Chat -->|"Voice audio"| LiveAPI
+    ChatAPI --> Guardrail --> LangGraph --> Tools
+    LiveAPI --> ADK --> Tools
+    LangGraph <--> Gemini
+    ADK <--> Gemini
+    Tools --> Milvus
+    Tools --> Databricks
+    Tools --> BigQuery
+    Auth --> SQLite
 
-    %% Browser to Backend
-    Login -->|"OAuth redirect"| AuthRoutes
-    AuthRoutes -->|"Cookie: session_token"| GoogleOAuth
-    GoogleOAuth -->|"userinfo"| AuthRoutes
-    AuthRoutes -->|"session + redirect"| Login
-
-    Chat -->|"POST /api/chat (SSE)"| ChatRoute
-    Chat -->|"WebSocket /api/agent/live"| LiveRoute
-
-    ChatRoute --> LangGraph
-    LiveRoute --> ADKAgent
-
-    LangGraph --> Guardrail
-    Guardrail -->|"IN_SCOPE"| ToolNode
-    Guardrail -->|"OUT_OF_SCOPE"| ChatRoute
-
-    ADKAgent --> ToolNode
-
-    LangGraph --> Gemini
-    LangGraph --> OpenAI
-    ADKAgent --> Gemini
-
-    ToolNode --> SearchMeta
-    ToolNode --> ExecSQL
-    ToolNode --> ExecBQ
-    ToolNode --> CreateViz
-    ToolNode --> CreateKPI
-    ToolNode --> CreateTable
-    ToolNode --> ModifyDash
-    ToolNode --> RemoveTiles
-    ToolNode --> CreateText
-    ToolNode --> GetSchema
-    ToolNode --> GetTileData
-
-    SearchMeta --> Milvus
-    ExecSQL --> Databricks
-    ExecBQ --> BigQuery
-    GetSchema --> BigQuery
-
-    AuthRoutes --> SQLite
-    WorkspaceRoutes --> SQLite
-
-    %% SSE/WebSocket events back to frontend
-    ChatRoute -->|"SSE events:<br/>visualization, data_table,<br/>kpi, agent_step, query"| ChatStore
-    LiveRoute -->|"WebSocket events:<br/>tool results, voice audio"| ChatStore
-
-    ChatStore -->|"callbacks"| DashStore
-    DashStore --> Dashboard
-    AgentStore --> Activity
-
-    Dashboard -->|"Vega-Lite charts<br/>Data tables<br/>KPI cards<br/>Text tiles"| Panels
+    Tools -->|"SSE / WS events:<br/>visualizations, tables,<br/>KPIs, layout changes"| Stores
+    Stores --> Dashboard
+    Stores --> Activity
 ```
-
-## Data Flow Summary
-
-| Flow | Protocol | Direction |
-|------|----------|-----------|
-| Text chat | SSE (Server-Sent Events) | Frontend → Backend → Frontend (streaming) |
-| Voice chat | WebSocket | Bidirectional real-time |
-| Auth | HTTP redirect + cookies | Frontend ↔ Google ↔ Backend |
-| Dashboard state | Zustand callbacks | Backend events → Store → React components |
-| Data queries | SQL over HTTP | Backend → Databricks / BigQuery |
-| Schema search | Vector similarity | Backend → Milvus |
-| Persistence | SQLite | Backend → Local file DB |
