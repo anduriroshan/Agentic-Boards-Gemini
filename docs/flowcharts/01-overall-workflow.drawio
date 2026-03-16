@@ -1,0 +1,149 @@
+<mxfile host="app.diagrams.net" agent="Claude" version="24.0.0">
+  <diagram name="Overall System Workflow" id="overall-workflow">
+    <mxGraphModel dx="1200" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Browser Subgraph -->
+        <mxCell id="grp_browser" value="Frontend (React 19 + TypeScript)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="620" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="chat" value="Chat Panel&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Text &amp; Voice Input)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6c8ebf;" vertex="1" parent="grp_browser">
+          <mxGeometry x="20" y="40" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="dashboard" value="Dashboard Canvas&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Drag-Drop Grid)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6c8ebf;" vertex="1" parent="grp_browser">
+          <mxGeometry x="170" y="40" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="activity" value="Agent Activity&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Real-Time Steps)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6c8ebf;" vertex="1" parent="grp_browser">
+          <mxGeometry x="320" y="40" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="stores" value="Zustand Stores&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(chat, dashboard, agent)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6c8ebf;" vertex="1" parent="grp_browser">
+          <mxGeometry x="470" y="40" width="140" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Backend Subgraph -->
+        <mxCell id="grp_backend" value="Backend (FastAPI + Python)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="210" width="620" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="auth" value="Google OAuth 2.0&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Session Management&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="grp_backend">
+          <mxGeometry x="20" y="40" width="160" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="chatapi" value="POST /api/chat&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(SSE Streaming)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="grp_backend">
+          <mxGeometry x="220" y="40" width="160" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="liveapi" value="WS /api/agent/live&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Voice + WebSocket)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="grp_backend">
+          <mxGeometry x="420" y="40" width="170" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- Agent Layer Subgraph -->
+        <mxCell id="grp_agent" value="AI Agent Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="380" width="620" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="guardrail" value="Guardrail&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Scope Check)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_agent">
+          <mxGeometry x="20" y="40" width="120" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="langgraph" value="LangGraph&lt;br&gt;ReAct Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_agent">
+          <mxGeometry x="160" y="40" width="120" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="adk" value="Google ADK Agent&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Multimodal Live)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_agent">
+          <mxGeometry x="310" y="40" width="140" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="tools" value="Agent Tools&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(search, query, visualize,&lt;br&gt;modify, remove)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_agent">
+          <mxGeometry x="470" y="35" width="140" height="65" as="geometry"/>
+        </mxCell>
+
+        <!-- Data & Storage Subgraph -->
+        <mxCell id="grp_data" value="Data &amp; Storage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="550" width="460" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="databricks" value="Databricks&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(SQL Warehouse)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#b85450;" vertex="1" parent="grp_data">
+          <mxGeometry x="10" y="40" width="110" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="bigquery" value="Google&lt;br&gt;BigQuery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#b85450;" vertex="1" parent="grp_data">
+          <mxGeometry x="130" y="40" width="90" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="milvus" value="Milvus Vector DB&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Schema Search)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#b85450;" vertex="1" parent="grp_data">
+          <mxGeometry x="230" y="40" width="110" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="sqlite" value="SQLite&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Users &amp; Sessions)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#b85450;" vertex="1" parent="grp_data">
+          <mxGeometry x="350" y="40" width="100" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- LLM Subgraph -->
+        <mxCell id="grp_llm" value="LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;container=1;collapsible=0;" vertex="1" parent="1">
+          <mxGeometry x="530" y="550" width="180" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="gemini" value="Google Gemini&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Vertex AI / API)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9673a6;" vertex="1" parent="grp_llm">
+          <mxGeometry x="20" y="40" width="140" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: Browser → Backend -->
+        <mxCell id="e1" value="Text messages" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" edge="1" source="chat" target="chatapi" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="Voice audio" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;" edge="1" source="chat" target="liveapi" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: Backend → Agent -->
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="chatapi" target="guardrail" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="guardrail" target="langgraph" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="langgraph" target="tools" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="liveapi" target="adk" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="adk" target="tools" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: Agent ↔ LLM (bidirectional) -->
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;startArrow=classic;endArrow=classic;strokeWidth=2;strokeColor=#9673a6;" edge="1" source="langgraph" target="gemini" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;startArrow=classic;endArrow=classic;strokeWidth=2;strokeColor=#9673a6;" edge="1" source="adk" target="gemini" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: Tools → Data -->
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="tools" target="milvus" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="tools" target="databricks" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="tools" target="bigquery" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="auth" target="sqlite" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: Tools → Stores (events back to frontend) -->
+        <mxCell id="e14" value="SSE / WS events:&#xa;visualizations, tables,&#xa;KPIs, layout changes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=1;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=1;entryDx=0;entryDy=0;fontSize=10;dashed=1;dashPattern=8 4;html=0;" edge="1" source="tools" target="stores" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="460"/>
+              <mxPoint x="700" y="130"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Edges: Stores → Dashboard & Activity -->
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;dashPattern=8 4;" edge="1" source="stores" target="dashboard" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;dashPattern=8 4;" edge="1" source="stores" target="activity" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

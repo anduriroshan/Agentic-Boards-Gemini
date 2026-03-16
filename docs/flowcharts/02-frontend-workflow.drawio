@@ -1,0 +1,191 @@
+<mxfile host="app.diagrams.net" agent="Claude" version="24.0.0">
+  <diagram name="Frontend Workflow" id="frontend-workflow">
+    <mxGraphModel dx="1200" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Row 1: App Launch -->
+        <mxCell id="start" value="App Launch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="30" width="140" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 2: Authenticated? -->
+        <mxCell id="authcheck" value="Authenticated?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="440" y="110" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_start_auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="start" target="authcheck" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Login branch -->
+        <mxCell id="login" value="Google Sign-In" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="230" y="125" width="130" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_auth_login" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="authcheck" target="login" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_login_auth" value="OAuth callback" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;curved=1;" edge="1" source="login" target="authcheck" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="295" y="110"/>
+              <mxPoint x="500" y="110"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Row 3: AppShell -->
+        <mxCell id="appshell" value="AppShell (3 Resizable Panels)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="230" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_auth_shell" value="Yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="authcheck" target="appshell" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 4: Three panels -->
+        <mxCell id="actpanel" value="Agent Activity&lt;br&gt;Panel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="230" y="310" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="dashpanel" value="Dashboard&lt;br&gt;Canvas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="440" y="310" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="chatpanel" value="Chat Panel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="650" y="310" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_shell_act" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="appshell" target="actpanel" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_shell_dash" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="appshell" target="dashpanel" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_shell_chat" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="appshell" target="chatpanel" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 5: Input type decision -->
+        <mxCell id="inputtype" value="Input type?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="650" y="400" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_chat_input" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="chatpanel" target="inputtype" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 6: SSE and WebSocket -->
+        <mxCell id="sse" value="POST /api/chat&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(SSE Stream)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="540" y="520" width="130" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ws" value="WebSocket&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;/api/agent/live&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="730" y="520" width="130" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_input_sse" value="Text" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="inputtype" target="sse" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_input_ws" value="Voice" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="inputtype" target="ws" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 7: Events converge -->
+        <mxCell id="events" value="Receive streaming events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="610" y="610" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_sse_events" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="sse" target="events" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_ws_events" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="ws" target="events" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 8: chatStore -->
+        <mxCell id="chatstore" value="chatStore processes events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="610" y="690" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_events_store" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="events" target="chatstore" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 9: Store operations -->
+        <mxCell id="addtile" value="dashboardStore&lt;br&gt;.addTile()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="430" y="775" width="130" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="updatetile" value="dashboardStore&lt;br&gt;.updateTile()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="620" y="775" width="130" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="addstep" value="agentStore&lt;br&gt;.addStep()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="810" y="775" width="120" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_store_add" value="visualization /&#xa;data_table / kpi_tile" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=0;" edge="1" source="chatstore" target="addtile" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_store_update" value="update_layout /&#xa;modify" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;html=0;" edge="1" source="chatstore" target="updatetile" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_store_step" value="agent_step" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="chatstore" target="addstep" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Connect stores back to panels -->
+        <mxCell id="e_add_dash" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;" edge="1" source="addtile" target="dashpanel" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="380" y="798"/>
+              <mxPoint x="380" y="333"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_update_dash" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;" edge="1" source="updatetile" target="dashpanel" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="850"/>
+              <mxPoint x="400" y="333"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_step_act" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;" edge="1" source="addstep" target="actpanel" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="798"/>
+              <mxPoint x="910" y="870"/>
+              <mxPoint x="170" y="870"/>
+              <mxPoint x="170" y="333"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Row 10: Tile type decision -->
+        <mxCell id="tiletype" value="Tile type?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="440" y="900" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_dash_tile" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="addtile" target="tiletype" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 11: Tile types -->
+        <mxCell id="chart" value="Vega-Lite&lt;br&gt;Chart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1020" width="100" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="table" value="Interactive&lt;br&gt;Data Table" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1020" width="100" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="kpi" value="KPI Metric&lt;br&gt;Card" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="550" y="1020" width="100" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="text" value="Markdown&lt;br&gt;Text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="700" y="1020" width="100" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_tile_chart" value="vega" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="tiletype" target="chart" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_tile_table" value="table" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="tiletype" target="table" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_tile_kpi" value="kpi" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="tiletype" target="kpi" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_tile_text" value="text" style="edgeStyle=orthogonalEdgeStyle;rounded=1;fontSize=10;" edge="1" source="tiletype" target="text" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
