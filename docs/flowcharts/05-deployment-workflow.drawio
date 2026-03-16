@@ -1,124 +1,132 @@
 <mxfile host="app.diagrams.net" agent="Claude" version="24.0.0">
-  <diagram name="Deployment Workflow" id="deployment-workflow">
-    <mxGraphModel dx="1200" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1000" math="0" shadow="0">
+  <diagram name="Deployment Workflow" id="dep1">
+    <mxGraphModel dx="1200" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="900" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
 
-        <!-- Build Subgraph -->
-        <mxCell id="grp_build" value="Docker Multi-Stage Build" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <!-- Build background -->
+        <mxCell id="bg_build" value="Docker Multi-Stage Build" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;" vertex="1" parent="1">
           <mxGeometry x="30" y="30" width="340" height="310" as="geometry"/>
         </mxCell>
-        <mxCell id="stage1" value="Stage 1: node:20-alpine&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;npm ci → Vite build&lt;br&gt;→ frontend/dist/&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#89b4fa;strokeColor=#6c8ebf;fontColor=#FFFFFF;" vertex="1" parent="grp_build">
-          <mxGeometry x="70" y="40" width="200" height="60" as="geometry"/>
+
+        <!-- Build nodes (absolute coords, parent=1) -->
+        <mxCell id="d_stage1" value="Stage 1: node:20-alpine&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;npm ci → Vite build → frontend/dist/&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#89b4fa;strokeColor=#6c8ebf;fontColor=#FFFFFF;" vertex="1" parent="1">
+          <mxGeometry x="100" y="70" width="200" height="55" as="geometry"/>
         </mxCell>
-        <mxCell id="stage2" value="Stage 2: python:3.12-slim&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;uv pip install&lt;br&gt;+ copy frontend dist&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a6e3a1;strokeColor=#82b366;" vertex="1" parent="grp_build">
-          <mxGeometry x="70" y="130" width="200" height="60" as="geometry"/>
+        <mxCell id="d_stage2" value="Stage 2: python:3.12-slim&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;uv pip install + copy frontend dist&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a6e3a1;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="100" y="160" width="200" height="55" as="geometry"/>
         </mxCell>
-        <mxCell id="image" value="Docker Image&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(FastAPI serves React SPA)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;fontStyle=1;" vertex="1" parent="grp_build">
-          <mxGeometry x="70" y="225" width="200" height="55" as="geometry"/>
+        <mxCell id="d_image" value="Docker Image&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(FastAPI serves React SPA)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#333333;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="255" width="200" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="e_s1_s2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="stage1" target="stage2" parent="grp_build">
+
+        <!-- Build edges -->
+        <mxCell id="de1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_stage1" target="d_stage2" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_s2_img" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="stage2" target="image" parent="grp_build">
+        <mxCell id="de2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_stage2" target="d_image" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <!-- Local Dev Subgraph -->
-        <mxCell id="grp_local" value="Local Development" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <!-- Local Dev background -->
+        <mxCell id="bg_local" value="Local Development" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;" vertex="1" parent="1">
           <mxGeometry x="30" y="420" width="340" height="220" as="geometry"/>
         </mxCell>
-        <mxCell id="compose" value="docker-compose up" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="grp_local">
-          <mxGeometry x="90" y="35" width="160" height="40" as="geometry"/>
+
+        <!-- Local nodes -->
+        <mxCell id="d_compose" value="docker-compose up" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="455" width="160" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="container" value="Container :8001 → :8000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="grp_local">
-          <mxGeometry x="70" y="95" width="190" height="40" as="geometry"/>
+        <mxCell id="d_container" value="Container :8001 → :8000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="100" y="515" width="190" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="vol1" value="./data mounted&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(SQLite + Milvus)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="grp_local">
-          <mxGeometry x="15" y="155" width="140" height="45" as="geometry"/>
+        <mxCell id="d_vol" value="./data mounted&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(SQLite + Milvus)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="45" y="575" width="140" height="45" as="geometry"/>
         </mxCell>
-        <mxCell id="envfile" value=".env loaded" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="grp_local">
-          <mxGeometry x="185" y="155" width="120" height="45" as="geometry"/>
+        <mxCell id="d_env" value=".env loaded" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="215" y="575" width="120" height="45" as="geometry"/>
         </mxCell>
-        <mxCell id="e_comp_cont" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="compose" target="container" parent="grp_local">
+
+        <!-- Local edges -->
+        <mxCell id="de3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_compose" target="d_container" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_cont_vol" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="container" target="vol1" parent="grp_local">
+        <mxCell id="de4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_container" target="d_vol" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_cont_env" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="container" target="envfile" parent="grp_local">
+        <mxCell id="de5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_container" target="d_env" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <!-- GCP Subgraph -->
-        <mxCell id="grp_gcp" value="GCP Production" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;container=1;collapsible=0;" vertex="1" parent="1">
+        <!-- GCP background -->
+        <mxCell id="bg_gcp" value="GCP Production" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=5;dashed=1;" vertex="1" parent="1">
           <mxGeometry x="440" y="420" width="700" height="350" as="geometry"/>
         </mxCell>
-        <mxCell id="push" value="Git push" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="20" y="40" width="100" height="40" as="geometry"/>
+
+        <!-- GCP nodes -->
+        <mxCell id="d_push" value="Git push" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="460" width="100" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="cloudbuild" value="Cloud Build&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(cloudbuild.yaml)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="160" y="35" width="130" height="50" as="geometry"/>
+        <mxCell id="d_cloudbuild" value="Cloud Build&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(cloudbuild.yaml)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="600" y="455" width="130" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="registry" value="Artifact Registry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="330" y="40" width="130" height="40" as="geometry"/>
+        <mxCell id="d_registry" value="Artifact Registry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="770" y="460" width="130" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="cloudrun" value="Cloud Run&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(1 CPU, 1Gi RAM)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="510" y="35" width="140" height="50" as="geometry"/>
+        <mxCell id="d_cloudrun" value="Cloud Run&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(1 CPU, 1Gi RAM)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="950" y="455" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_gcs" value="GCS Bucket&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(FUSE mount at /app/data)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="790" y="560" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_vertexai" value="Vertex AI&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Gemini)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="995" y="560" width="110" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_bq" value="BigQuery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="840" y="640" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_extdb" value="Databricks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="995" y="640" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="d_cloudflare" value="Cloudflare DNS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="970" y="720" width="120" height="40" as="geometry"/>
         </mxCell>
 
-        <!-- Cloud Run connections -->
-        <mxCell id="gcs" value="GCS Bucket&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(FUSE mount at /app/data)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="350" y="140" width="170" height="45" as="geometry"/>
-        </mxCell>
-        <mxCell id="vertexai" value="Vertex AI&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;(Gemini)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="555" y="140" width="110" height="45" as="geometry"/>
-        </mxCell>
-        <mxCell id="bq" value="BigQuery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="400" y="220" width="100" height="40" as="geometry"/>
-        </mxCell>
-        <mxCell id="extdb" value="Databricks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#d6b656;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="555" y="220" width="100" height="40" as="geometry"/>
-        </mxCell>
-        <mxCell id="cloudflare" value="Cloudflare DNS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="grp_gcp">
-          <mxGeometry x="530" y="290" width="120" height="40" as="geometry"/>
-        </mxCell>
-
-        <!-- GCP internal edges -->
-        <mxCell id="e_push_cb" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="push" target="cloudbuild" parent="grp_gcp">
+        <!-- GCP edges -->
+        <mxCell id="de6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_push" target="d_cloudbuild" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_cb_reg" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="cloudbuild" target="registry" parent="grp_gcp">
+        <mxCell id="de7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_cloudbuild" target="d_registry" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_reg_run" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="registry" target="cloudrun" parent="grp_gcp">
+        <mxCell id="de8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_registry" target="d_cloudrun" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_run_gcs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="cloudrun" target="gcs" parent="grp_gcp">
+        <mxCell id="de9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_cloudrun" target="d_gcs" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_run_vertex" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="cloudrun" target="vertexai" parent="grp_gcp">
+        <mxCell id="de10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_cloudrun" target="d_vertexai" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_run_bq" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="cloudrun" target="bq" parent="grp_gcp">
+        <mxCell id="de11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_cloudrun" target="d_bq" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_run_db" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="cloudrun" target="extdb" parent="grp_gcp">
+        <mxCell id="de12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_cloudrun" target="d_extdb" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_cf_run" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="cloudflare" target="cloudrun" parent="grp_gcp">
+        <mxCell id="de13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;" edge="1" source="d_cloudflare" target="d_cloudrun" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
         <!-- Cross-subgraph edges: Image → Local and GCP -->
-        <mxCell id="e_img_compose" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" edge="1" source="image" target="compose" parent="1">
+        <mxCell id="de14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" edge="1" source="d_image" target="d_compose" parent="1">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e_img_cb" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" edge="1" source="image" target="cloudbuild" parent="1">
+        <mxCell id="de15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;" edge="1" source="d_image" target="d_cloudbuild" parent="1">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="400" y="283"/>
+              <mxPoint x="400" y="280"/>
               <mxPoint x="400" y="400"/>
               <mxPoint x="665" y="400"/>
             </Array>
