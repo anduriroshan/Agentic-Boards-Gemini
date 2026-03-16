@@ -30,7 +30,7 @@ Powered by the **Google Agent Development Kit (ADK)** for real-time interaction 
 
 ## Key Features
 
-- **Multimodal Live Agent:** Talk to your data. Use voice and audio for a low-latency, "always-on" analytical companion.
+- **Multimodal Live Agent:** Talk to your data. Powered by **gemini-live-2.5-flash-native-audio**, use voice and audio for a low-latency, "always-on" analytical companion.
 - **Dynamic Chart Authoring:** Agents generate Vega-Lite specifications on-demand, giving them precise control over axes, colors, and transformations.
 - **Interactive Dashboards:** Drag-and-drop grid. Resize, move, or remove tiles.
 - **Auto-Refresh & Live Data:** Charts can be configured to refresh automatically, ensuring your insights are always up to date.
@@ -85,7 +85,7 @@ Agentic Boards runs **two separate agents** under the hood, both sharing the sam
 
 1. User message hits `POST /api/chat` (FastAPI)
 2. **Guardrail node** classifies intent as `IN_SCOPE` / `OUT_OF_SCOPE` using a fast Gemini call
-3. **Agent node** — Gemini 2.0 Flash with all tools bound; generates tool calls
+3. **Agent node** — **gemini-2.5-flash** with all tools bound; generates tool calls
 4. **ToolNode** executes the tool, returns result; loops back to agent
 5. Final answer streams back to the browser via **Server-Sent Events (SSE)**
 6. Frontend intercepts `tool_call` events and mutates the React dashboard state
@@ -144,7 +144,7 @@ The `modify_dashboard` tool can surgically update just the spec, just the layout
 |---|---|
 | **Frontend** | React 19, TypeScript, Vite, Zustand, Vega-Lite, Tailwind CSS |
 | **Backend** | FastAPI (Python 3.13), LangGraph, LangChain, SQLAlchemy |
-| **LLM Engines** | Gemini (Live API & Batch), OpenAI, Vertex AI |
+| **LLM Engines** | Gemini 2.5 Flash (Live & Batch) |
 | **Agent Framework** | Google Agent Development Kit (ADK) + LangGraph ReAct |
 | **Authentication** | Google OAuth 2.0 (Authlib) |
 | **Session Database** | SQLite (Users, Chat History, Dashboards) |
