@@ -127,7 +127,7 @@ The `modify_dashboard` tool can surgically update just the spec, just the layout
 
 | Problem | Solution |
 |---|---|
-| 32K context limit in Live API | `summarize_tool_output()`; samples first 15 rows, tells model full data is in UI |
+| 32K context limit in Live API | `summarize_tool_output()`; UI gets full rows, but LLM only gets first 15 to save tokens |
 | Duplicate tool events from ADK | SHA-1 dedup on `(turn_id + tool_name + args)` per session |
 | Agent calling tools on context sync | `has_user_audio` gate — model only gets context after first user speech |
 | LLM describing chart instead of drawing it | `_needs_visualization_nudge()` — detects SQL-without-viz and re-invokes with a hard instruction |
